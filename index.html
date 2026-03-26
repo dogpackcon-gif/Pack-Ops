@@ -1554,6 +1554,41 @@ function populateClientDatalist() {
     .map(c => `<option value="${c.name}">${c.company ? c.company + ' — ' : ''}${c.city || ''}</option>`)
     .join('');
 }
+
+function showPage(id) {
+  // Hide all pages
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  // Show target page
+  const page = document.getElementById('page-' + id);
+  if (page) page.classList.add('active');
+  // Update sidebar nav
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const navItem = document.querySelector(`.nav-item[onclick*="'${id}'"]`);
+  if (navItem) navItem.classList.add('active');
+  // Update mobile nav
+  document.querySelectorAll('.mob-nav-item').forEach(n => n.classList.remove('active'));
+  const mobItem = document.getElementById('mobnav-' + id);
+  if (mobItem) mobItem.classList.add('active');
+  // Render the page content
+  renderPage(id);
+  // Scroll to top
+  window.scrollTo(0, 0);
+}
+
+function renderPage(id) {
+  if (id === 'dashboard')      renderDashboard();
+  if (id === 'contacts')       renderContacts();
+  if (id === 'leads')          renderLeads();
+  if (id === 'quotes')         renderQuotes();
+  if (id === 'jobs')           renderJobs();
+  if (id === 'timetracking')   renderTimeTracking();
+  if (id === 'invoicehistory') renderInvoiceHistory();
+  if (id === 'materials')      renderMaterials();
+  if (id === 'assemblies')     renderAssemblies();
+  if (id === 'priceimport')    renderPriceImport && renderPriceImport();
+  if (id === 'settings')       renderSettings();
+  if (id === 'quotebuilder')   renderQuoteBuilder && renderQuoteBuilder();
+}
 const $ = id => document.getElementById(id);
 const fmt = n => isNaN(n) || n === 0 ? '-' : '$'+Number(n).toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});
 const pct = n => isNaN(n) ? '-' : (n*100).toFixed(1)+'%';
