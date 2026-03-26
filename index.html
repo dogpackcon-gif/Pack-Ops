@@ -3,9 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pack Ops">
+<meta name="theme-color" content="#0f1117">
 <title>Pack Operations</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
 :root {
   --bg: #0f1117;
@@ -250,6 +257,69 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   /* Prevent iOS auto-zoom on input focus */
   input, select, textarea { font-size: 16px !important; }
 }
+
+/* ===== REDESIGN 2.0 ===== */
+/* Quick action buttons on dashboard */
+.dash-quick-btn {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:6px; padding:16px 8px; background:var(--surface2); border:1px solid var(--border);
+  border-radius:12px; color:var(--text); font-family:'Barlow',sans-serif;
+  font-size:13px; font-weight:600; cursor:pointer; transition:all 0.15s;
+}
+.dash-quick-btn:hover { background:var(--surface); border-color:var(--accent); color:var(--accent); }
+@media (max-width:768px) { .dash-quick-btn { padding:14px 6px; font-size:12px; } }
+
+/* Alert cards */
+.alert-card {
+  display:flex; align-items:center; gap:12px; padding:12px 16px;
+  border-radius:10px; margin-bottom:8px; font-size:13px; cursor:pointer;
+}
+.alert-card.red   { background:rgba(239,68,68,0.12);  border:1px solid rgba(239,68,68,0.3); }
+.alert-card.yellow{ background:rgba(234,179,8,0.12);   border:1px solid rgba(234,179,8,0.3); }
+.alert-card.blue  { background:rgba(59,130,246,0.12);  border:1px solid rgba(59,130,246,0.3); }
+.alert-card .alert-icon { font-size:20px; flex-shrink:0; }
+.alert-card .alert-text { flex:1; }
+.alert-card .alert-title { font-weight:700; }
+.alert-card .alert-sub   { font-size:12px; color:var(--text3); margin-top:2px; }
+.alert-card .alert-count { font-family:'Barlow Condensed',sans-serif; font-size:22px; font-weight:700; }
+
+/* Today hero strip */
+.today-hero { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+.today-hero-card {
+  background:var(--surface2); border-radius:12px; padding:16px 18px;
+  display:flex; flex-direction:column; gap:4px;
+}
+.today-hero-card .th-label { font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:1px; }
+.today-hero-card .th-val   { font-family:'Barlow Condensed',sans-serif; font-size:32px; font-weight:700; line-height:1; }
+.today-hero-card .th-sub   { font-size:12px; color:var(--text3); }
+@media (max-width:768px) { .today-hero { grid-template-columns:1fr 1fr; } .today-hero-card .th-val { font-size:26px; } }
+
+/* Job cards for mobile (replaces table rows on small screens) */
+.job-card {
+  padding:14px 16px; border-bottom:1px solid var(--border); cursor:pointer;
+  transition:background 0.1s;
+}
+.job-card:last-child { border-bottom:none; }
+.job-card:hover { background:var(--surface2); }
+.job-card-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; }
+.job-card-code { font-family:'Barlow Condensed',sans-serif; font-size:16px; font-weight:700; color:var(--accent); }
+.job-card-client { font-weight:600; font-size:14px; }
+.job-card-desc { font-size:12px; color:var(--text3); margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.job-card-bottom { display:flex; justify-content:space-between; align-items:center; }
+.job-card-profit { font-family:'Barlow Condensed',sans-serif; font-size:18px; font-weight:700; }
+.job-alert-tag { font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; margin-left:4px; text-transform:uppercase; letter-spacing:0.5px; }
+.job-alert-tag.over  { background:rgba(239,68,68,0.2);  color:var(--red); }
+.job-alert-tag.warn  { background:rgba(234,179,8,0.2);   color:var(--yellow); }
+.job-alert-tag.good  { background:rgba(34,197,94,0.2);   color:var(--green); }
+
+/* Duplicate job button */
+.btn-dup { border-color:var(--blue); color:var(--blue); }
+
+/* Empty state */
+.empty-state { text-align:center; padding:40px 20px; color:var(--text3); }
+.empty-state .es-icon { font-size:36px; margin-bottom:12px; }
+.empty-state .es-title { font-size:15px; font-weight:600; color:var(--text2); margin-bottom:6px; }
+.empty-state .es-sub { font-size:13px; margin-bottom:16px; }
 </style>
 </head>
 <body>
@@ -331,25 +401,42 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 
       <!-- ===== DASHBOARD ===== -->
       <div id="page-dashboard" class="page active">
-        <!-- Top KPI row -->
-        <div class="stats-grid" id="dashStats" style="margin-bottom:16px;"></div>
 
-        <!-- Revenue this month vs last + YTD profit -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;" class="dash-grid-2">
-          <div class="table-card">
-            <div class="table-header"><span class="table-title">📈 Revenue</span></div>
-            <div id="dashRevenue" style="padding:16px;font-size:13px;"></div>
-          </div>
-          <div class="table-card">
-            <div class="table-header"><span class="table-title">💵 Gross Profit YTD</span></div>
-            <div id="dashProfit" style="padding:16px;font-size:13px;"></div>
-          </div>
+        <!-- TODAY HERO STRIP -->
+        <div id="dash-today-strip" style="margin-bottom:20px;"></div>
+
+        <!-- ACTION REQUIRED (alerts) -->
+        <div id="dash-alerts" style="margin-bottom:16px;"></div>
+
+        <!-- QUICK ACTIONS (mobile-friendly big buttons) -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;" id="dash-quick-actions">
+          <button class="dash-quick-btn" onclick="openNewJob()">
+            <span style="font-size:24px;">🔧</span>
+            <span>New Job</span>
+          </button>
+          <button class="dash-quick-btn" onclick="openModal('modal-lead')">
+            <span style="font-size:24px;">📋</span>
+            <span>New Lead</span>
+          </button>
+          <button class="dash-quick-btn" onclick="openModal('modal-timelog')">
+            <span style="font-size:24px;">⏱</span>
+            <span>Log Time</span>
+          </button>
         </div>
 
-        <!-- Unpaid + Leads + Active Jobs -->
+        <!-- TODAY'S JOBS -->
+        <div class="table-card" style="margin-bottom:16px;">
+          <div class="table-header">
+            <span class="table-title">🔧 Active Jobs</span>
+            <button class="btn btn-ghost btn-sm" onclick="showPage('jobs')">All jobs →</button>
+          </div>
+          <div id="dashActiveJobs"></div>
+        </div>
+
+        <!-- TWO COL: Awaiting payment + Open leads -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;" class="dash-grid-2">
           <div class="table-card">
-            <div class="table-header"><span class="table-title">💸 Awaiting Payment</span></div>
+            <div class="table-header"><span class="table-title">💸 Owed to You</span></div>
             <div id="dashUnpaid" style="padding:0;"></div>
           </div>
           <div class="table-card">
@@ -358,45 +445,38 @@ textarea.form-control { resize: vertical; min-height: 80px; }
           </div>
         </div>
 
-        <!-- Active Jobs full width -->
-        <div class="table-card" style="margin-bottom:16px;">
-          <div class="table-header">
-            <span class="table-title">📈 Revenue by Month</span>
+        <!-- REVENUE CHART + JOB TYPES -->
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px;" class="dash-grid-2">
+          <div class="table-card">
+            <div class="table-header"><span class="table-title">📈 Revenue by Month</span></div>
+            <div style="padding:16px;"><canvas id="dash-revenue-chart" style="max-height:120px;"></canvas></div>
           </div>
-          <div style="padding:16px;">
-            <canvas id="dash-revenue-chart" height="80"></canvas>
+          <div class="table-card">
+            <div class="table-header"><span class="table-title">📊 By Job Type</span></div>
+            <div id="dashByType" style="padding:14px;font-size:13px;"></div>
           </div>
         </div>
 
-        <!-- Job type breakdown + active jobs -->
-        <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:16px;" class="dash-grid-2">
-          <div class="table-card">
-            <div class="table-header"><span class="table-title">📊 Jobs by Type</span></div>
-            <div id="dashByType" style="padding:14px;font-size:13px;"></div>
-          </div>
-          <div class="table-card">
-            <div class="table-header">
-              <span class="table-title">🔧 Active Jobs</span>
-              <button class="btn btn-ghost btn-sm" onclick="showPage('jobs')">View all →</button>
-            </div>
-            <div id="dashActiveJobs"></div>
-          </div>
-        </div>
+        <!-- KPI ROW at bottom -->
+        <div class="stats-grid" id="dashStats" style="margin-bottom:16px;"></div>
       </div>
+
 
       <!-- ===== LEADS ===== -->
       <div id="page-leads" class="page">
         <div class="search-bar">
           <div class="search-wrap"><input class="search-input" placeholder="Search leads..." oninput="filterTable('leads-table', this.value)"></div>
-          <select class="form-control" style="width:150px;" onchange="filterLeadStatus(this.value)">
-            <option value="">All Statuses</option>
-            <option>New</option><option>Waiting to Quote</option><option>Quoting</option><option>Quote Sent</option><option>Follow Up</option><option>Won</option><option>Lost</option>
-          </select>
-          <button class="btn btn-primary" onclick="openModal('modal-lead')">+ New Lead</button>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select class="form-control" style="width:160px;" onchange="filterLeadStatus(this.value)">
+              <option value="">All Statuses</option>
+              <option>New</option><option>Waiting to Quote</option><option>Quoting</option><option>Quote Sent</option><option>Follow Up</option><option>Won</option><option>Lost</option>
+            </select>
+            <button class="btn btn-primary" onclick="openModal('modal-lead')">+ New Lead</button>
+          </div>
         </div>
         <div class="table-card">
-          <table id="leads-table">
-            <thead><tr><th>Lead ID</th><th>Date</th><th>Contact</th><th>Phone</th><th>Source</th><th>Description</th><th>Job Type</th><th>Value</th><th>Status</th><th>Next Step</th><th>Actions</th></tr></thead>
+          <table id="leads-table" style="width:100%;font-size:13px;">
+            <thead><tr><th>ID</th><th>Date</th><th>Contact</th><th class="hide-mobile">Phone</th><th class="hide-mobile">Source</th><th class="hide-mobile">Description</th><th>Status</th><th class="hide-mobile">Value</th><th></th></tr></thead>
             <tbody id="leads-body"></tbody>
           </table>
         </div>
@@ -409,8 +489,8 @@ textarea.form-control { resize: vertical; min-height: 80px; }
           <button class="btn btn-primary" onclick="openNewQuote()">+ New Quote</button>
         </div>
         <div class="table-card">
-          <table id="quotes-table">
-            <thead><tr><th>Quote ID</th><th>Lead ID</th><th>Job Code</th><th>Date</th><th>Client</th><th>Description</th><th>Est. Hrs</th><th>Labour $</th><th>Material $</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
+          <table id="quotes-table" style="width:100%;font-size:13px;">
+            <thead><tr><th>ID</th><th>Date</th><th>Client</th><th class="hide-mobile">Description</th><th class="hide-mobile">Job Type</th><th class="hide-mobile">Hours</th><th>Total</th><th>Status</th><th></th></tr></thead>
             <tbody id="quotes-body"></tbody>
           </table>
         </div>
@@ -420,15 +500,17 @@ textarea.form-control { resize: vertical; min-height: 80px; }
       <div id="page-jobs" class="page">
         <div class="search-bar">
           <div class="search-wrap"><input class="search-input" placeholder="Search jobs..." oninput="filterTable('jobs-table', this.value)"></div>
-          <select class="form-control" style="width:160px;" onchange="filterJobStatus(this.value)">
-            <option value="">All Statuses</option>
-            <option>Pending</option><option>Scheduled</option><option>In Progress</option><option>Rough in Billed</option><option>Billed</option><option>On Hold</option><option>Complete</option><option>Paid</option>
-          </select>
-          <button class="btn btn-primary" onclick="openNewJob()">+ New Job</button>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <select class="form-control" style="width:160px;" onchange="filterJobStatus(this.value)">
+              <option value="">All Statuses</option>
+              <option>Pending</option><option>Scheduled</option><option>In Progress</option><option>Rough in Billed</option><option>Billed</option><option>On Hold</option><option>Complete</option>
+            </select>
+            <button class="btn btn-primary" onclick="openNewJob()">+ New Job</button>
+          </div>
         </div>
         <div class="table-card">
-          <table id="jobs-table">
-            <thead><tr><th>Job Code</th><th>Client</th><th>Description</th><th>Status</th><th>Revenue</th><th>Labour Cost</th><th>Material Cost</th><th>Gross Profit</th><th>Margin</th><th>Paid?</th><th>Actions</th></tr></thead>
+          <table id="jobs-table" style="width:100%;font-size:13px;">
+            <thead><tr><th>Job #</th><th>Client</th><th class="hide-mobile">Description</th><th class="hide-mobile">Type</th><th>Status</th><th class="hide-mobile">Quote</th><th class="hide-mobile">Revenue</th><th class="hide-mobile">GP</th><th>Paid</th><th></th></tr></thead>
             <tbody id="jobs-body"></tbody>
           </table>
         </div>
@@ -436,21 +518,18 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 
       <!-- ===== MATERIALS ===== -->
       <div id="page-materials" class="page">
-        <div class="tabs">
-          <div class="tab active" onclick="showMaterialTab('master')">Material Master</div>
-          <div class="tab" onclick="showMaterialTab('entries')">Material Entries</div>
+        <div class="tabs" style="margin-bottom:16px;">
+          <div class="tab active" onclick="matTab('master',this)">📦 Material Master</div>
+          <div class="tab" onclick="matTab('entries',this)">🧾 Material Entries</div>
         </div>
         <div id="mat-tab-master">
           <div class="search-bar">
-            <div class="search-wrap"><input class="search-input" placeholder="Search materials..." oninput="filterTable('materials-table', this.value)"></div>
-            <select class="form-control" style="width:160px;" onchange="filterMaterialCategory(this.value)" id="matCatFilter">
-              <option value="">All Categories</option>
-            </select>
-            <button class="btn btn-primary" onclick="openModal('modal-material')">+ Add Item</button>
+            <div class="search-wrap"><input class="search-input" placeholder="Search materials..." oninput="filterMaterials(this.value)"></div>
+            <button class="btn btn-primary" onclick="openModal('modal-material')">+ New Material</button>
           </div>
           <div class="table-card">
-            <table id="materials-table">
-              <thead><tr><th>Category</th><th>Item ID</th><th>Item Name</th><th>Unit Cost</th><th>Sell Price (+30%)</th><th>Actions</th></tr></thead>
+            <table style="width:100%;font-size:13px;">
+              <thead><tr><th>Item ID</th><th>Name</th><th>Category</th><th class="text-right">Cost</th><th></th></tr></thead>
               <tbody id="materials-body"></tbody>
             </table>
           </div>
@@ -461,8 +540,8 @@ textarea.form-control { resize: vertical; min-height: 80px; }
             <button class="btn btn-primary" onclick="openModal('modal-entry')">+ Add Entry</button>
           </div>
           <div class="table-card">
-            <table id="entries-table">
-              <thead><tr><th>Date</th><th>Supplier</th><th>Invoice #</th><th>Job Code</th><th>Subtotal</th><th>GST</th><th>PST</th><th>Total</th><th>Entered By</th><th>Review?</th></tr></thead>
+            <table id="entries-table" style="width:100%;font-size:13px;">
+              <thead><tr><th>Date</th><th>Supplier</th><th>Invoice #</th><th>Job Code</th><th>Subtotal</th><th>GST</th><th>PST</th><th>Total</th><th>Entered By</th><th>Review?</th><th></th></tr></thead>
               <tbody id="entries-body"></tbody>
             </table>
           </div>
@@ -695,10 +774,16 @@ textarea.form-control { resize: vertical; min-height: 80px; }
           <div class="table-card">
             <div class="table-header"><span class="table-title">ℹ️ About</span></div>
             <div style="padding:20px;font-size:13px;color:var(--text2);line-height:1.8;">
-              <div><strong>⚡ Pack Operations Dashboard</strong></div>
+              <div style="margin-top:8px;"><strong>⚡ Pack Operations Dashboard</strong></div>
               <div>Built for Pack Operations — Spallumcheen, BC</div>
               <div style="margin-top:8px;">Next Job #: <strong id="settings-next-job"></strong></div>
               <div id="settings-data-summary" style="margin-top:4px;color:var(--text3);"></div>
+              <div style="margin-top:14px;">
+                <button id="pwa-install-btn" class="btn btn-primary btn-sm" onclick="installPWA()" style="display:block;">
+                  📲 Install App on This Device
+                </button>
+                <div style="font-size:11px;color:var(--text3);margin-top:6px;">Works on iPhone, Android, and desktop. Opens like a real app.</div>
+              </div>
             </div>
           </div>
 
@@ -716,6 +801,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
           <div style="display:flex;gap:10px;">
             <button class="btn btn-ghost" onclick="clearQuoteBuilder()">🗑 Clear</button>
             <button class="btn btn-ghost" id="copy-mat-btn" onclick="copyMaterialList()" style="border-color:var(--blue);color:var(--blue);">📋 Copy Material List</button>
+            <button class="btn btn-ghost" onclick="exportQuotePDF()" style="border-color:var(--green);color:var(--green);">📄 PDF</button>
             <button class="btn btn-ghost" id="create-job-btn" onclick="createJobFromQuote()">⚡ Create Job</button>
             <button class="btn btn-primary" onclick="saveQuoteFromBuilder()">💾 Save Quote</button>
           </div>
@@ -735,7 +821,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
                     <button type="button" class="btn btn-ghost btn-sm" style="white-space:nowrap;flex-shrink:0;" onclick="autoFillClientQB()" title="Fill from contacts">👤 Fill</button>
                   </div>
                 </div>
-                  <div class="form-group"><label class="form-label">Project Description</label><input class="form-control" id="qb-project" placeholder="Project description"></div>
+                  <div class="form-group"><label class="form-label">Project Description <button type="button" class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 8px;border-color:var(--accent);color:var(--accent);margin-left:6px;" onclick="aiGenerateQuoteDesc()">✨ AI Write</button></label><input class="form-control" id="qb-project" placeholder="Project description"></div>
                   <div class="form-group"><label class="form-label">Job Code</label><input class="form-control" id="qb-jobcode" placeholder="e.g. 26041"></div>
                 </div>
                 <div class="form-grid form-grid-3">
@@ -1811,8 +1897,8 @@ state.entries = [
 
 state.assemblies = [
   { name:'Standard plug Drop', items:[
-    {item:'Single gang airtight',qty:1,cost:2.59},
-    {item:'2c14',qty:5,cost:1.55},
+    {item:'Single gang airtight',qty:1,cost:3.25},
+    {item:'2c14',qty:5,cost:1.94},
     {item:'15A Receptacle',qty:1,cost:2.27},
     {item:'SINGLE Plate',qty:1,cost:0.74},
     {item:'Labour',qty:0.25,cost:65},
@@ -1820,140 +1906,140 @@ state.assemblies = [
   { name:'Switch drop', items:[
     {item:'Labour',qty:0.25,cost:65},
     {item:'SINGLE POLE Switch',qty:1,cost:2.27},
-    {item:'Single gang airtight',qty:1,cost:2.59},
-    {item:'2c14',qty:5,cost:1.55},
+    {item:'Single gang airtight',qty:1,cost:3.25},
+    {item:'2c14',qty:5,cost:1.94},
     {item:'SINGLE Plate',qty:1,cost:0.74},
   ]},
   { name:'Pot light drop', items:[
     {item:'4\" FLAT POT',qty:1,cost:11.42},
-    {item:'2c14',qty:6,cost:1.55},
+    {item:'2c14',qty:6,cost:1.94},
     {item:'Labour',qty:0.5,cost:65},
   ]},
   { name:'Range curcuit', items:[
-    {item:'Range box airtight',qty:1,cost:9.22},
-    {item:'3c8',qty:15,cost:9.64},
+    {item:'Range box airtight',qty:1,cost:11.57},
+    {item:'3c8',qty:15,cost:12.09},
     {item:'RANGE Receptacle',qty:1,cost:5.15},
-    {item:'2P 40A Siemens',qty:1,cost:25.83},
+    {item:'2P 40A Siemens',qty:1,cost:32.4},
     {item:'Labour',qty:1,cost:65},
   ]},
   { name:'Dryer circuit', items:[
-    {item:'Range box airtight',qty:1,cost:9.22},
-    {item:'3c10',qty:15,cost:5.29},
+    {item:'Range box airtight',qty:1,cost:11.57},
+    {item:'3c10',qty:15,cost:6.64},
     {item:'DRYER Receptacle',qty:1,cost:5.15},
-    {item:'2P 30A Siemens',qty:1,cost:24.93},
+    {item:'2P 30A Siemens',qty:1,cost:31.27},
     {item:'Labour',qty:1,cost:65},
   ]},
   { name:'Counter Circuit', items:[
-    {item:'Single gang airtight',qty:2,cost:2.59},
-    {item:'2c12',qty:25,cost:2.22},
-    {item:'20A Siemens',qty:1,cost:11.25},
+    {item:'Single gang airtight',qty:2,cost:3.25},
+    {item:'2c12',qty:25,cost:2.78},
+    {item:'20A Siemens',qty:1,cost:14.11},
     {item:'20A Receptacle',qty:2,cost:6.00},
     {item:'Labour',qty:1,cost:65},
   ]},
   { name:'15a Arc Circuit', items:[
-    {item:'2c14',qty:15,cost:1.55},
+    {item:'2c14',qty:15,cost:1.94},
     {item:'Labour',qty:1,cost:65},
-    {item:'15A AFCI Leviton',qty:1,cost:63.18},
+    {item:'15A AFCI Leviton',qty:1,cost:79.25},
   ]},
   { name:'Pole mounted Combo Service', items:[
     {item:'200A COMBO METERBASE',qty:1,cost:778.02},
     {item:'CLASS5 25\' POLE',qty:1,cost:779.32},
-    {item:'2 RPVC',qty:1,cost:33.67},
+    {item:'2 RPVC',qty:1,cost:42.24},
     {item:'GUY WIRE (FT)',qty:20,cost:1.49},
     {item:'GUY WIRE WRAP',qty:1,cost:10.28},
     {item:'2\" WEATHER HEAD',qty:1,cost:63.36},
-    {item:'3c250MCM ACWU',qty:6,cost:29.65},
+    {item:'3c250MCM ACWU',qty:6,cost:37.19},
     {item:'METER RING',qty:1,cost:15.04},
     {item:'INSULATER',qty:1,cost:31.54},
     {item:'ANCHOR',qty:1,cost:55.81},
     {item:'CLEVIS/BOLT',qty:1,cost:28.03},
     {item:'HUB ADAPTER',qty:1,cost:26.99},
     {item:'Labour',qty:8,cost:65},
-    {item:'Permit',qty:1,cost:850},
+    {item:'Permit',qty:1,cost:1066.24},
   ]},
   { name:'Pole installation', items:[
     {item:'Labour',qty:4,cost:65},
     {item:'Excavator rental',qty:1,cost:600},
   ]},
   { name:'HRV 15a Circuit', items:[
-    {item:'2c14',qty:15,cost:1.55},
+    {item:'2c14',qty:15,cost:1.94},
     {item:'Labour',qty:1,cost:65},
-    {item:'15A AFCI Leviton',qty:1,cost:63.18},
+    {item:'15A AFCI Leviton',qty:1,cost:79.25},
     {item:'15A Receptacle',qty:1,cost:2.27},
     {item:'SINGLE Plate',qty:1,cost:0.74},
   ]},
   { name:'Exterior 15a Circuit', items:[
-    {item:'2c14',qty:30,cost:1.55},
+    {item:'2c14',qty:30,cost:1.94},
     {item:'Labour',qty:2,cost:65},
-    {item:'15A AFCI Leviton',qty:1,cost:63.18},
+    {item:'15A AFCI Leviton',qty:1,cost:79.25},
     {item:'15A Receptacle',qty:1,cost:2.27},
     {item:'SINGLE Plate',qty:1,cost:0.74},
   ]},
   { name:'A/C curcuit', items:[
-    {item:'Disconnect',qty:1,cost:19.07},
-    {item:'2c10',qty:15,cost:3.99},
-    {item:'2P 30A Siemens',qty:1,cost:24.93},
+    {item:'Disconnect',qty:1,cost:23.92},
+    {item:'2c10',qty:15,cost:5.01},
+    {item:'2P 30A Siemens',qty:1,cost:31.27},
     {item:'1/2 LIQUID TIGHT',qty:10,cost:3.16},
     {item:'1/2 90 CONNECTOR',qty:2,cost:3.97},
     {item:'Labour',qty:3,cost:65},
   ]},
   { name:'Electric HWT', items:[
-    {item:'2c10',qty:10,cost:3.99},
-    {item:'2P 30A Siemens',qty:1,cost:24.93},
+    {item:'2c10',qty:10,cost:5.01},
+    {item:'2P 30A Siemens',qty:1,cost:31.27},
     {item:'Labour',qty:1,cost:65},
   ]},
   { name:'Smokie Drop', items:[
-    {item:'Octagon box airtight',qty:1,cost:6.18},
+    {item:'Octagon box airtight',qty:1,cost:7.75},
     {item:'SMOKE',qty:1,cost:31.25},
-    {item:'3c14',qty:10,cost:2.13},
+    {item:'3c14',qty:10,cost:2.67},
   ]},
   { name:'Carb/Smokie Drop', items:[
-    {item:'Octagon box airtight',qty:1,cost:6.18},
+    {item:'Octagon box airtight',qty:1,cost:7.75},
     {item:'CARBON/SMOKE',qty:1,cost:67.70},
-    {item:'3c14',qty:10,cost:2.13},
+    {item:'3c14',qty:10,cost:2.67},
   ]},
   { name:'EV curcuit 15m', items:[
-    {item:'Range box airtight',qty:1,cost:9.22},
-    {item:'3c8',qty:15,cost:9.64},
+    {item:'Range box airtight',qty:1,cost:11.57},
+    {item:'3c8',qty:15,cost:12.09},
     {item:'RANGE Receptacle',qty:1,cost:5.15},
-    {item:'2P 40A Siemens',qty:1,cost:25.83},
+    {item:'2P 40A Siemens',qty:1,cost:32.4},
     {item:'Labour',qty:2,cost:65},
   ]},
   { name:'200a panel+tie in', items:[
-    {item:'200A 1PH 32/64',qty:1,cost:242.97},
+    {item:'200A 1PH 32/64',qty:1,cost:304.78},
     {item:'Labour',qty:6,cost:65},
   ]},
   { name:'200A overhead service', items:[
     {item:'Labour',qty:8,cost:65},
     {item:'200A METERBASE',qty:1,cost:142.77},
-    {item:'42sp 200a indoor panel',qty:1,cost:292.32},
+    {item:'42sp 200a indoor panel',qty:1,cost:366.69},
     {item:'2\" WEATHER HEAD',qty:1,cost:63.36},
     {item:'HUB ADAPTER',qty:1,cost:26.99},
-    {item:'3c250MCM ACWU',qty:8,cost:29.65},
+    {item:'3c250MCM ACWU',qty:8,cost:37.19},
   ]},
   { name:'BBH Curcuit R/I', items:[
     {item:'Labour',qty:2,cost:65},
-    {item:'Single gang airtight',qty:4,cost:2.59},
-    {item:'2c10',qty:100,cost:3.99},
+    {item:'Single gang airtight',qty:4,cost:3.25},
+    {item:'2c10',qty:100,cost:5.01},
   ]},
   { name:'Plug curcuit R/I', items:[
-    {item:'Single gang airtight',qty:12,cost:2.59},
-    {item:'2c14',qty:40,cost:1.55},
-    {item:'15A AFCI Leviton',qty:1,cost:63.18},
+    {item:'Single gang airtight',qty:12,cost:3.25},
+    {item:'2c14',qty:40,cost:1.94},
+    {item:'15A AFCI Leviton',qty:1,cost:79.25},
     {item:'15A Receptacle',qty:12,cost:2.27},
     {item:'SINGLE Plate',qty:12,cost:0.74},
     {item:'Labour',qty:2,cost:65},
   ]},
   { name:'Lighting Curcuit R/I', items:[
-    {item:'Double gang airtight',qty:10,cost:5.69},
-    {item:'2c14',qty:75,cost:1.55},
+    {item:'Double gang airtight',qty:10,cost:7.14},
+    {item:'2c14',qty:75,cost:1.94},
     {item:'Labour',qty:4,cost:65},
-    {item:'15A Siemens',qty:1,cost:10.78},
+    {item:'15A Siemens',qty:1,cost:13.52},
   ]},
   { name:'Washer 15a Circuit', items:[
-    {item:'2c14',qty:15,cost:1.55},
+    {item:'2c14',qty:15,cost:1.94},
     {item:'Labour',qty:1,cost:65},
-    {item:'15A AFCI Leviton',qty:1,cost:63.18},
+    {item:'15A AFCI Leviton',qty:1,cost:79.25},
     {item:'15A Receptacle',qty:1,cost:2.27},
     {item:'SINGLE Plate',qty:1,cost:0.74},
   ]},
@@ -2796,6 +2882,7 @@ function renderJobs(filter='', statusFilter='') {
       <td>
         <button class="btn btn-ghost btn-sm" onclick="editJob(${state.jobs.indexOf(j)})">Edit</button>
         <button class="btn btn-ghost btn-sm" onclick="viewJobNotes(${state.jobs.indexOf(j)})" title="Notes/Details">📝</button>
+        <button class="btn btn-ghost btn-sm btn-dup" onclick="duplicateJob(${state.jobs.indexOf(j)})" title="Duplicate job">⧉</button>
         <button class="btn btn-danger btn-sm" onclick="deleteJob(${state.jobs.indexOf(j)})">✕</button>
       </td>
     </tr>`;
@@ -2813,7 +2900,34 @@ function editJob(i) {
   $('j-paid').value=j.paid||'No'; $('j-notes').value=j.notes;
   openModal('modal-job');
 }
-function deleteJob(i) { if(confirm('Delete job?')) { state.jobs.splice(i,1); renderJobs(); } }
+function deleteJob(i) { if(confirm('Delete job?')) { state.jobs.splice(i,1); saveData(); renderJobs(); renderDashboard(); } }
+
+function duplicateJob(i) {
+  const j = JSON.parse(JSON.stringify(state.jobs[i]));
+  const newCode = String(getNextJobNum());
+  j.code    = newCode;
+  j.status  = 'Pending';
+  j.paid    = 'No';
+  j.revenue = 0;
+  j.lhrs    = 0;
+  j.lcost   = 0;
+  j.mcost   = 0;
+  j.date    = new Date().toISOString().split('T')[0];
+  j.notes   = 'Duplicated from ' + state.jobs[i].code;
+  delete j.jobLines;
+  delete j.actLines;
+  delete j.invoices;
+  state.jobs.push(j);
+  saveData();
+  updateNextJobDisplay();
+  renderJobs();
+  // Flash confirmation
+  const fb = document.createElement('div');
+  fb.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--blue);color:#fff;padding:10px 20px;border-radius:8px;font-weight:600;z-index:9999;font-size:14px;';
+  fb.textContent = '⧉ Job duplicated as ' + newCode;
+  document.body.appendChild(fb);
+  setTimeout(() => fb.remove(), 2500);
+}
 function openNewJob() {
   state.editIdx.jobs = null;
   $('modal-job-title').textContent = 'New Job';
@@ -2940,26 +3054,77 @@ function saveEntry() {
 }
 
 // ===================== ASSEMBLIES =====================
+// ── LIVE COST LOOKUP ──────────────────────────────────────────────────────
+// Always returns the current material master price.
+// Falls back to the stored cost if the item isn't found (e.g. Labour).
+function getLiveCost(itemName, storedCost) {
+  if (!itemName) return storedCost || 0;
+  const mat = state.materials.find(m =>
+    m.name === itemName ||
+    m.name.toLowerCase() === itemName.toLowerCase()
+  );
+  return mat ? mat.cost : (storedCost || 0);
+}
+
 function assemblyTotal(a) {
-  return a.items.reduce((s,i) => s + (i.qty||0)*(i.cost||0), 0);
+  return a.items.reduce((s,i) => s + (i.qty||0) * getLiveCost(i.item, i.cost), 0);
 }
+
 function assemblyLabour(a) {
-  return a.items.filter(i=>i.item.toLowerCase().includes('labour')).reduce((s,i)=>s+(i.qty||0)*(i.cost||0),0);
+  return a.items
+    .filter(i => i.item.toLowerCase().includes('labour'))
+    .reduce((s,i) => s + (i.qty||0) * getLiveCost(i.item, i.cost), 0);
 }
+
+function confirmAddAssembly() {
+  const i = parseInt($('qb-assembly-select').value);
+  const a = state.assemblies[i];
+  const target = $('modal-qb-assembly').dataset.target || 'quote';
+  a.items.forEach(it => {
+    const mat      = state.materials.find(m => m.name===it.item || m.name.toLowerCase()===it.item.toLowerCase());
+    const liveCost = getLiveCost(it.item, it.cost);   // ← live price
+    const line = {
+      label:        it.item,
+      itemId:       mat ? mat.id : '',
+      type:         'assembly',
+      assemblyName: a.name,
+      qty:          it.qty,
+      cost:         liveCost,   // ← always current price
+      isLabour:     it.item.toLowerCase().includes('labour')
+    };
+    if (target === 'job')     _jobLines.push(line);
+    else if (target === 'actuals') _actLines.push(line);
+    else state.qbLines.push(line);
+  });
+  delete $('modal-qb-assembly').dataset.target;
+  closeModal('modal-qb-assembly');
+  if (target === 'job')          renderJobLines();
+  else if (target === 'actuals') renderActuals();
+  else { renderQBLines(); recalcQuote(); }
+}
+// assemblyLabour moved above (uses getLiveCost)
 function renderAssemblies(filter='') {
   let data = state.assemblies;
   if (filter) data = data.filter(a => a.name.toLowerCase().includes(filter.toLowerCase()));
-  $('assemblies-grid').innerHTML = data.map((a,i) => {
-    const total = assemblyTotal(a);
-    const labour = assemblyLabour(a);
-    const mat = total - labour;
+  $('assemblies-grid').innerHTML = data.map((a,idx) => {
+    const total  = assemblyTotal(a);  // live prices
+    const labour = assemblyLabour(a); // live prices
+    const mat    = total - labour;
     const labHrs = a.items.filter(x=>x.item.toLowerCase().includes('labour')).reduce((s,x)=>s+(x.qty||0),0);
+    // Check if any item prices have changed since assembly was created
+    const changedItems = a.items.filter(it => {
+      const live = getLiveCost(it.item, it.cost);
+      return Math.abs(live - it.cost) > 0.001 && !it.item.toLowerCase().includes('labour');
+    });
+    const priceChangeBadge = changedItems.length
+      ? `<span style="font-size:10px;background:rgba(234,179,8,0.2);color:var(--yellow);padding:2px 8px;border-radius:4px;margin-left:6px;">⚡ ${changedItems.length} price${changedItems.length>1?'s':''} updated</span>`
+      : '';
     return `<div class="table-card">
       <div class="table-header">
-        <span class="table-title" style="font-size:15px;">${a.name}</span>
+        <span class="table-title" style="font-size:15px;">${a.name}${priceChangeBadge}</span>
         <div style="display:flex;gap:6px;">
-          <button class="btn btn-ghost btn-sm" onclick="editAssembly(${i})">Edit</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteAssembly(${i})">✕</button>
+          <button class="btn btn-ghost btn-sm" onclick="editAssembly(${idx})">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteAssembly(${idx})">✕</button>
         </div>
       </div>
       <div style="padding:12px 16px;">
@@ -2969,8 +3134,20 @@ function renderAssemblies(filter='') {
           <div><span class="text-muted">Material:</span> <strong>${fmt(mat)}</strong></div>
         </div>
         <table style="width:100%;font-size:12px;">
-          <thead><tr><th style="padding:4px 6px;">Item</th><th style="padding:4px 6px;text-align:right;">Qty</th><th style="padding:4px 6px;text-align:right;">Cost</th></tr></thead>
-          <tbody>${a.items.map(item=>`<tr><td style="padding:3px 6px;">${item.item}</td><td style="padding:3px 6px;text-align:right;">${item.qty}</td><td style="padding:3px 6px;text-align:right;">${fmt(item.qty*item.cost)}</td></tr>`).join('')}</tbody>
+          <thead><tr><th style="padding:4px 6px;">Item</th><th style="padding:4px 6px;text-align:right;">Qty</th><th style="padding:4px 6px;text-align:right;">Live Cost</th></tr></thead>
+          <tbody>${a.items.map(item => {
+            const liveCost  = getLiveCost(item.item, item.cost);
+            const lineTotal = (item.qty||0) * liveCost;
+            const changed   = Math.abs(liveCost - item.cost) > 0.001 && !item.item.toLowerCase().includes('labour');
+            return `<tr style="${changed?'background:rgba(234,179,8,0.06);':''}">
+              <td style="padding:3px 6px;">${item.item}</td>
+              <td style="padding:3px 6px;text-align:right;">${item.qty}</td>
+              <td style="padding:3px 6px;text-align:right;">
+                ${changed ? `<span style="text-decoration:line-through;color:var(--text3);font-size:10px;margin-right:4px;">${fmt(item.qty*item.cost)}</span>` : ''}
+                ${fmt(lineTotal)}
+              </td>
+            </tr>`;
+          }).join('')}</tbody>
         </table>
       </div>
     </div>`;
@@ -3054,27 +3231,30 @@ function updateAssemblyPreview() {
   const i = parseInt($('qb-assembly-select').value);
   const a = state.assemblies[i];
   if (!a) return;
-  const total = assemblyTotal(a);
-  $('qb-assembly-preview').innerHTML = `<div style="font-size:13px;"><strong>${a.name}</strong> — <span class="text-accent">${fmt(total)}</span><br><div style="margin-top:8px;color:var(--text2);">${a.items.map(it=>`${it.item} × ${it.qty} = ${fmt(it.qty*it.cost)}`).join('<br>')}</div></div>`;
+  const total = assemblyTotal(a); // uses live prices
+  const rows = a.items.map(it => {
+    const liveCost  = getLiveCost(it.item, it.cost);
+    const lineTotal = (it.qty||0) * liveCost;
+    const changed   = Math.abs(liveCost - it.cost) > 0.001;
+    const badge     = changed
+      ? `<span style="font-size:10px;background:rgba(234,179,8,0.2);color:var(--yellow);padding:1px 6px;border-radius:4px;margin-left:4px;">updated</span>`
+      : '';
+    return `<div style="display:flex;justify-content:space-between;padding:2px 0;">
+      <span>${it.item} × ${it.qty}${badge}</span>
+      <span>${changed ? `<span style="text-decoration:line-through;color:var(--text3);font-size:11px;">${fmt(it.qty*it.cost)}</span> ` : ''}${fmt(lineTotal)}</span>
+    </div>`;
+  }).join('');
+  $('qb-assembly-preview').innerHTML = `
+    <div style="font-size:13px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <strong>${a.name}</strong>
+        <span class="text-accent">${fmt(total)}</span>
+      </div>
+      <div style="color:var(--text2);font-size:12px;">${rows}</div>
+    </div>`;
 }
 $('qb-assembly-select') && $('qb-assembly-select').addEventListener('change', updateAssemblyPreview);
-function confirmAddAssembly() {
-  const i = parseInt($('qb-assembly-select').value);
-  const a = state.assemblies[i];
-  const target = $('modal-qb-assembly').dataset.target || 'quote';
-  a.items.forEach(it => {
-    const mat = state.materials.find(m => m.name===it.item || m.name.toLowerCase()===it.item.toLowerCase());
-    const line = { label:it.item, itemId:mat?mat.id:'', type:'assembly', assemblyName:a.name, qty:it.qty, cost:it.cost, isLabour:it.item.toLowerCase().includes('labour') };
-    if (target === 'job') _jobLines.push(line);
-    else if (target === 'actuals') _actLines.push(line);
-    else state.qbLines.push(line);
-  });
-  delete $('modal-qb-assembly').dataset.target;
-  closeModal('modal-qb-assembly');
-  if (target === 'job') renderJobLines();
-  else if (target === 'actuals') renderActuals();
-  else { renderQBLines(); recalcQuote(); }
-}
+// confirmAddAssembly moved above (uses getLiveCost)
 function addLineItem() {
   const sel = $('qb-mat-select');
   sel.innerHTML = state.materials.map((m,i)=>`<option value="${i}">${m.name} (${m.cat}) — ${fmt(m.cost)}</option>`).join('');
@@ -4507,218 +4687,241 @@ function renderDashboard() {
   const leads   = state.leads;
   const entries = state.entries;
   const now     = new Date();
-  const thisMonth = now.toISOString().slice(0,7);
-  const lastMonth = new Date(now.getFullYear(), now.getMonth()-1, 1).toISOString().slice(0,7);
-  const thisYear  = now.getFullYear().toString();
 
-  // Revenue calcs — use revenue field or approved amount
-  const revThisMonth = jobs.filter(j=>j.notes&&j.notes.includes&&false).reduce((s)=>s,0); // placeholder
-  // Use entries for revenue tracking if available, otherwise job revenue
-  const allRevenue    = jobs.reduce((s,j)=>s+(j.revenue||0),0);
-  const ytdProfit     = jobs.reduce((s,j)=>s+(j.revenue||0)-(j.lcost||0)-(j.mcost||0),0);
-  const ytdMargin     = allRevenue > 0 ? ((ytdProfit/allRevenue)*100).toFixed(1) : 0;
-  const activeJobs    = jobs.filter(j=>['In Progress','Pending','Scheduled','Rough in Billed'].includes(j.status));
-  const unpaidJobs    = jobs.filter(j=>j.paid!=='Yes' && ['Billed','Rough in Billed','Complete'].includes(j.status));
-  const unpaidTotal   = unpaidJobs.reduce((s,j)=>s+(j.revenue||0),0);
-  const openLeads     = leads.filter(l=>!['Won','Lost'].includes(l.status));
-  const invTotal      = entries.reduce((s,e)=>s+(e.total||0),0);
+  const activeJobs  = jobs.filter(j => !['Paid','Complete'].includes(j.status));
+  const unpaidJobs  = jobs.filter(j => j.paid !== 'Yes' && ['Billed','Rough in Billed','Complete'].includes(j.status));
+  const openLeads   = leads.filter(l => !['Won','Lost'].includes(l.status));
+  const allRevenue  = jobs.reduce((s,j) => s+(j.revenue||0), 0);
+  const ytdProfit   = jobs.reduce((s,j) => s+(j.revenue||0)-(j.lcost||0)-(j.mcost||0), 0);
+  const unpaidTotal = unpaidJobs.reduce((s,j) => s+(j.revenue||0), 0);
+  const invTotal    = entries.reduce((s,e) => s+(e.total||0), 0);
 
-  // KPI stats
-  $('dashStats').innerHTML = `
-    <div class="stat-card"><div class="stat-label">Active Jobs</div><div class="stat-val accent">${activeJobs.length}</div></div>
-    <div class="stat-card"><div class="stat-label">Open Leads</div><div class="stat-val accent">${openLeads.length}</div></div>
-    <div class="stat-card"><div class="stat-label">Awaiting Payment</div><div class="stat-val yellow">${unpaidJobs.length} jobs</div><div class="stat-sub">${fmt(unpaidTotal)}</div></div>
-    <div class="stat-card"><div class="stat-label">YTD Revenue</div><div class="stat-val green">${fmt(allRevenue)}</div></div>
-  `;
-
-  // Revenue card
-  $('dashRevenue').innerHTML = `
-    <div class="ms-item"><span>Total Revenue (all jobs)</span><strong class="text-green">${fmt(allRevenue)}</strong></div>
-    <div class="ms-item"><span>Active job pipeline</span><strong class="text-accent">${fmt(activeJobs.reduce((s,j)=>s+(j.quote||j.revenue||0),0))}</strong></div>
-    <div class="ms-item"><span>Total invoiced (materials)</span><strong>${fmt(invTotal)}</strong></div>
-    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--text3);">
-      Next Job # <strong style="color:var(--text);">${getNextJobNum()}</strong>
-    </div>`;
-
-  // YTD Profit card
-  $('dashProfit').innerHTML = `
-    <div style="text-align:center;padding:8px 0;">
-      <div class="stat-val ${ytdProfit>=0?'green':'red'}" style="font-size:32px;">${fmt(ytdProfit)}</div>
-      <div style="font-size:13px;color:var(--text3);margin-top:4px;">Gross Profit YTD</div>
-      <div style="font-size:20px;font-weight:700;margin-top:8px;color:${parseFloat(ytdMargin)>=25?'var(--green)':'var(--yellow)'};">${ytdMargin}%</div>
-      <div style="font-size:12px;color:var(--text3);">Avg Gross Margin</div>
+  // ── TODAY HERO STRIP ────────────────────────────────────────────────
+  const ytdMargin = allRevenue > 0 ? ((ytdProfit/allRevenue)*100).toFixed(1) : '0';
+  $('dash-today-strip').innerHTML = `<div class="today-hero">
+    <div class="today-hero-card">
+      <div class="th-label">Active Jobs</div>
+      <div class="th-val accent">${activeJobs.length}</div>
+      <div class="th-sub">${openLeads.length} open leads</div>
     </div>
-    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
-      <div class="ms-item"><span>Total Labour Cost</span><span>${fmt(jobs.reduce((s,j)=>s+(j.lcost||0),0))}</span></div>
-      <div class="ms-item"><span>Total Material Cost</span><span>${fmt(jobs.reduce((s,j)=>s+(j.mcost||0),0))}</span></div>
-    </div>`;
+    <div class="today-hero-card">
+      <div class="th-label">Owed to You</div>
+      <div class="th-val" style="color:var(--yellow);">${fmt(unpaidTotal)}</div>
+      <div class="th-sub">${unpaidJobs.length} jobs unpaid</div>
+    </div>
+    <div class="today-hero-card">
+      <div class="th-label">YTD Revenue</div>
+      <div class="th-val" style="color:var(--green);">${fmt(allRevenue)}</div>
+      <div class="th-sub">${fmt(invTotal)} invoiced</div>
+    </div>
+    <div class="today-hero-card">
+      <div class="th-label">Gross Profit</div>
+      <div class="th-val ${ytdProfit>=0?'text-green':'text-red'}">${fmt(ytdProfit)}</div>
+      <div class="th-sub">${ytdMargin}% margin</div>
+    </div>
+  </div>`;
 
-  // Unpaid jobs
+  // ── ALERTS (what needs attention) ────────────────────────────────────
+  const alerts = [];
+
+  // Over budget jobs
+  const overBudget = activeJobs.filter(j => {
+    const actual = (j.lcost||0) + (j.mcost||0);
+    const quoted = j.quote || 0;
+    return quoted > 0 && actual > quoted * 0.9;
+  });
+  if (overBudget.length) alerts.push({
+    type:'red', icon:'🚨', title:`${overBudget.length} job${overBudget.length>1?'s':''} over budget`,
+    sub: overBudget.slice(0,2).map(j=>j.code+' '+j.client).join(', '),
+    action: () => showPage('jobs')
+  });
+
+  // Jobs with no time logged
+  const noTime = activeJobs.filter(j => !j.lhrs && j.status === 'In Progress');
+  if (noTime.length) alerts.push({
+    type:'yellow', icon:'⏱', title:`${noTime.length} in-progress job${noTime.length>1?'s':''} with no time logged`,
+    sub: noTime.slice(0,2).map(j=>j.code+' '+j.client).join(', '),
+    action: () => showPage('jobs')
+  });
+
+  // Overdue quotes (sent more than 7 days ago — use quote date if available)
+  const overdueQuotes = leads.filter(l => l.status === 'Quote Sent');
+  if (overdueQuotes.length) alerts.push({
+    type:'yellow', icon:'💬', title:`${overdueQuotes.length} quote${overdueQuotes.length>1?'s':''} waiting for response`,
+    sub: overdueQuotes.slice(0,2).map(l=>l.contact).join(', '),
+    action: () => showPage('leads')
+  });
+
+  // Jobs billed but unpaid
+  if (unpaidJobs.length) alerts.push({
+    type:'blue', icon:'💸', title:`${unpaidJobs.length} job${unpaidJobs.length>1?'s':''} awaiting payment`,
+    sub: fmt(unpaidTotal) + ' outstanding',
+    action: () => showPage('jobs')
+  });
+
+  $('dash-alerts').innerHTML = alerts.length ?
+    alerts.map(a => `<div class="alert-card ${a.type}" onclick="(${a.action.toString()})()">
+      <span class="alert-icon">${a.icon}</span>
+      <div class="alert-text">
+        <div class="alert-title">${a.title}</div>
+        ${a.sub ? `<div class="alert-sub">${a.sub}</div>` : ''}
+      </div>
+      <span style="color:var(--text3);font-size:18px;">›</span>
+    </div>`).join('') : '';
+
+  // ── ACTIVE JOBS (cards on mobile, table on desktop) ──────────────────
+  const showJobs = activeJobs.slice(0, 8);
+  if (showJobs.length) {
+    $('dashActiveJobs').innerHTML = showJobs.map(j => {
+      const gp       = (j.revenue||0)-(j.lcost||0)-(j.mcost||0);
+      const actual   = (j.lcost||0)+(j.mcost||0);
+      const isOver   = j.quote > 0 && actual > j.quote * 0.9;
+      const noTimeL  = !j.lhrs && j.status === 'In Progress';
+      const noInv    = j.status === 'Billed' && j.paid !== 'Yes';
+      const alerts   = (isOver ? '<span class="job-alert-tag over">Over Budget</span>' : '') +
+                       (noTimeL ? '<span class="job-alert-tag warn">No Time</span>' : '') +
+                       (noInv  ? '<span class="job-alert-tag warn">Unpaid</span>' : '');
+      const idx = state.jobs.indexOf(j);
+      return `<div class="job-card" onclick="viewJobNotes(${idx})">
+        <div class="job-card-top">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span class="job-card-code">${j.code}</span>
+              ${statusBadge(j.status)}
+              ${alerts}
+            </div>
+            <div class="job-card-client">${j.client}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="job-card-profit ${gp>=0?'text-green':'text-red'}">${fmt(gp)}</div>
+            <div style="font-size:11px;color:var(--text3);">GP</div>
+          </div>
+        </div>
+        <div class="job-card-desc">${j.desc||'No description'}</div>
+        <div class="job-card-bottom">
+          <div style="font-size:12px;color:var(--text3);">${j.lhrs||0}h logged · ${fmt(j.revenue)} revenue</div>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openTimeLog('${j.code}')">+ Time</button>
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    $('dashActiveJobs').innerHTML = `<div class="empty-state">
+      <div class="es-icon">🔧</div>
+      <div class="es-title">No active jobs</div>
+      <div class="es-sub">Create your first job to get started</div>
+      <button class="btn btn-primary btn-sm" onclick="openNewJob()">+ New Job</button>
+    </div>`;
+  }
+
+  // ── AWAITING PAYMENT ─────────────────────────────────────────────────
   $('dashUnpaid').innerHTML = unpaidJobs.length ?
-    `<table style="width:100%;font-size:12px;">
-      <thead><tr><th>Job</th><th>Client</th><th>Status</th><th class="text-right">Amount</th></tr></thead>
-      <tbody>${unpaidJobs.slice(0,6).map(j=>`<tr style="cursor:pointer;" onclick="showPage('jobs')">
-        <td class="font-mono">${j.code}</td>
-        <td>${j.client}</td>
-        <td>${statusBadge(j.status)}</td>
-        <td class="text-right text-accent"><strong>${fmt(j.revenue)}</strong></td>
-      </tr>`).join('')}
-      ${unpaidJobs.length>6?`<tr><td colspan="4" style="text-align:center;padding:8px;color:var(--text3);font-size:11px;">+${unpaidJobs.length-6} more</td></tr>`:''}
-      </tbody>
-    </table>
-    <div style="padding:10px 14px;border-top:1px solid var(--border);font-size:13px;display:flex;justify-content:space-between;">
+    unpaidJobs.slice(0,5).map(j => `
+      <div class="job-card" onclick="viewJobNotes(${state.jobs.indexOf(j)})">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-weight:600;font-size:13px;">${j.client}</div>
+            <div style="font-size:11px;color:var(--text3);">${j.code} · ${statusBadge(j.status)}</div>
+          </div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:var(--yellow);">${fmt(j.revenue)}</div>
+        </div>
+      </div>`).join('') +
+    `<div style="padding:10px 16px;border-top:1px solid var(--border);font-size:13px;display:flex;justify-content:space-between;">
       <span style="color:var(--text3);">Total owed</span>
       <strong class="text-accent">${fmt(unpaidTotal)}</strong>
     </div>` :
-    '<div class="no-data">All caught up! 🎉</div>';
+    `<div class="empty-state" style="padding:24px;">
+      <div class="es-icon">✅</div>
+      <div class="es-title">All caught up!</div>
+    </div>`;
 
-  // Open leads
+  // ── OPEN LEADS ────────────────────────────────────────────────────────
   $('dashLeads').innerHTML = openLeads.length ?
-    `<table style="width:100%;font-size:12px;">
-      <thead><tr><th>Contact</th><th>Description</th><th>Status</th><th class="text-right">Value</th></tr></thead>
-      <tbody>${openLeads.slice(0,6).map(l=>`<tr style="cursor:pointer;" onclick="showPage('leads')">
-        <td><strong>${l.contact}</strong></td>
-        <td class="hide-mobile">${l.desc||'—'}</td>
-        <td>${statusBadge(l.status)}</td>
-        <td class="text-right">${l.value?fmt(l.value):'—'}</td>
-      </tr>`).join('')}
-      ${openLeads.length>6?`<tr><td colspan="4" style="text-align:center;padding:8px;color:var(--text3);font-size:11px;">+${openLeads.length-6} more</td></tr>`:''}
-      </tbody>
-    </table>` :
-    '<div class="no-data">No open leads</div>';
+    openLeads.slice(0,5).map(l => `
+      <div class="job-card" onclick="showPage('leads')">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-weight:600;font-size:13px;">${l.contact}</div>
+            <div style="font-size:11px;color:var(--text3);">${statusBadge(l.status)} · ${l.desc||l.jobtype||'—'}</div>
+          </div>
+          <div style="font-size:13px;color:var(--text3);">${l.value?fmt(l.value):'—'}</div>
+        </div>
+      </div>`).join('') :
+    `<div class="empty-state" style="padding:24px;">
+      <div class="es-icon">📋</div>
+      <div class="es-title">No open leads</div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:8px;" onclick="openModal('modal-lead')">+ Add Lead</button>
+    </div>`;
 
-  // Active jobs
-  const showJobs = activeJobs.slice(0, 8);
-  $('dashActiveJobs').innerHTML = showJobs.length ?
-    `<table style="width:100%;font-size:12px;">
-      <thead><tr><th>Job #</th><th>Client</th><th class="hide-mobile">Description</th><th>Status</th><th class="text-right hide-mobile">Revenue</th><th class="text-right hide-mobile">GP</th><th></th></tr></thead>
-      <tbody>${showJobs.map(j=>{
-        const gp = (j.revenue||0)-(j.lcost||0)-(j.mcost||0);
-        return `<tr>
-          <td class="font-mono" style="cursor:pointer;color:var(--accent);" onclick="viewJobNotes(${state.jobs.indexOf(j)})">${j.code}</td>
-          <td>${j.client}</td>
-          <td class="hide-mobile">${j.desc}</td>
-          <td>${statusBadge(j.status)}</td>
-          <td class="text-right hide-mobile">${fmt(j.revenue)}</td>
-          <td class="text-right hide-mobile ${gp>=0?'text-green':'text-red'}">${fmt(gp)}</td>
-          <td><button class="btn btn-ghost btn-sm" onclick="openTimeLog('${j.code}')">+ Time</button></td>
-        </tr>`;
-      }).join('')}</tbody>
-    </table>` :
-    '<div class="no-data">No active jobs</div>';
-
-  // ── Revenue by month chart ─────────────────────────────────────────────
+  // ── REVENUE CHART (Chart.js) ─────────────────────────────────────────
   const monthRevMap = {};
   jobs.forEach(j => {
-    if (!j.revenue) return;
-    // Use job code year prefix + approximate month from entries if available
-    const key = j.date ? j.date.slice(0,7) : null;
-    if (!key) return;
+    if (!j.revenue || !j.date) return;
+    const key = j.date.slice(0,7);
     if (!monthRevMap[key]) monthRevMap[key] = {rev:0, gp:0};
     monthRevMap[key].rev += (j.revenue||0);
     monthRevMap[key].gp  += (j.revenue||0)-(j.lcost||0)-(j.mcost||0);
   });
-  const months   = Object.keys(monthRevMap).sort().slice(-6);
-  const revVals  = months.map(m => monthRevMap[m].rev);
-  const gpVals   = months.map(m => monthRevMap[m].gp);
-  const maxVal   = Math.max(...revVals, 1);
-  const canvas   = $('dash-revenue-chart');
-  if (canvas && months.length) {
-    const ctx    = canvas.getContext('2d');
-    const W      = canvas.offsetWidth || 600;
-    const H      = canvas.height = 100;
-    canvas.width = W;
-    ctx.clearRect(0,0,W,H);
-    const barW   = Math.floor((W - 40) / months.length);
-    const pad    = 4;
-    months.forEach((m, i) => {
-      const x    = 20 + i * barW;
-      const revH = Math.round((revVals[i] / maxVal) * (H - 24));
-      const gpH  = Math.round((Math.max(0,gpVals[i]) / maxVal) * (H - 24));
-      // Revenue bar
-      ctx.fillStyle = '#3b82f620';
-      ctx.fillRect(x+pad, H-20-revH, barW-pad*2-4, revH);
-      // GP bar
-      ctx.fillStyle = gpVals[i]>=0 ? '#22c55e80' : '#ef444480';
-      ctx.fillRect(x+pad+4, H-20-gpH, barW-pad*2-12, gpH);
-      // Label
-      ctx.fillStyle = '#64748b';
-      ctx.font = '9px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(m.slice(5), x+barW/2, H-6);
-    });
-    // Legend
-    ctx.fillStyle = '#3b82f6'; ctx.fillRect(W-110,4,10,8);
-    ctx.fillStyle = '#94a3b8'; ctx.font='10px sans-serif'; ctx.textAlign='left';
-    ctx.fillText('Revenue', W-97, 12);
-    ctx.fillStyle = '#22c55e'; ctx.fillRect(W-50,4,10,8);
-    ctx.fillText('GP', W-37, 12);
-  } else if (canvas && !months.length) {
-    const ctx = canvas.getContext('2d'); canvas.width = canvas.offsetWidth||600; canvas.height=100;
-    ctx.fillStyle='#64748b'; ctx.font='13px sans-serif'; ctx.textAlign='center';
-    ctx.fillText('No revenue data yet — add revenue amounts to your jobs', (canvas.width||600)/2, 50);
+  const months  = Object.keys(monthRevMap).sort().slice(-6);
+  const revVals = months.map(m => monthRevMap[m].rev);
+  const gpVals  = months.map(m => monthRevMap[m].gp);
+  const canvas  = $('dash-revenue-chart');
+  if (canvas) {
+    if (canvas._chartInst) { canvas._chartInst.destroy(); canvas._chartInst = null; }
+    if (months.length && typeof Chart !== 'undefined') {
+      canvas._chartInst = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: months.map(m => m.slice(5)),
+          datasets: [
+            { label:'Revenue', data:revVals, backgroundColor:'rgba(59,130,246,0.5)', borderColor:'#3b82f6', borderWidth:1, borderRadius:4 },
+            { label:'Gross Profit', data:gpVals, backgroundColor:gpVals.map(v=>v>=0?'rgba(34,197,94,0.6)':'rgba(239,68,68,0.6)'), borderColor:gpVals.map(v=>v>=0?'#22c55e':'#ef4444'), borderWidth:1, borderRadius:4 }
+          ]
+        },
+        options: {
+          responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{ labels:{ color:'#94a3b8', font:{size:11}, boxWidth:12 } } },
+          scales:{
+            x:{ ticks:{color:'#64748b'}, grid:{color:'rgba(42,48,69,0.5)'} },
+            y:{ ticks:{color:'#64748b', callback:v=>'$'+Math.round(v/1000)+'k'}, grid:{color:'rgba(42,48,69,0.5)'} }
+          }
+        }
+      });
+    } else if (!months.length) {
+      const ctx=canvas.getContext('2d');
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle='#64748b'; ctx.font='13px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('Add revenue to jobs to see chart', canvas.offsetWidth/2||200, 50);
+    }
   }
 
-  // ── Jobs by type ──────────────────────────────────────────────────────
+  // ── JOBS BY TYPE ─────────────────────────────────────────────────────
   const byType = {};
   jobs.forEach(j => {
-    const t = j.jobtype || 'Other';
-    if (!byType[t]) byType[t] = {count:0, rev:0, gp:0};
-    byType[t].count++;
-    byType[t].rev += (j.revenue||0);
-    byType[t].gp  += (j.revenue||0)-(j.lcost||0)-(j.mcost||0);
+    const t = j.jobtype||'Other';
+    if (!byType[t]) byType[t]={count:0,rev:0,gp:0};
+    byType[t].count++; byType[t].rev+=(j.revenue||0);
+    byType[t].gp+=(j.revenue||0)-(j.lcost||0)-(j.mcost||0);
   });
   const typeEl = $('dashByType');
   if (typeEl) typeEl.innerHTML = Object.entries(byType).sort((a,b)=>b[1].rev-a[1].rev).map(([type,d])=>`
-    <div class="ms-item" style="flex-direction:column;align-items:flex-start;gap:2px;padding:6px 0;border-bottom:1px solid var(--border);">
-      <div style="display:flex;justify-content:space-between;width:100%;">
-        <span style="font-weight:600;">${type}</span>
-        <span style="color:var(--accent);">${fmt(d.rev)}</span>
+    <div style="padding:6px 0;border-bottom:1px solid var(--border);">
+      <div style="display:flex;justify-content:space-between;">
+        <span style="font-weight:600;font-size:12px;">${type}</span>
+        <span class="text-accent" style="font-size:12px;">${fmt(d.rev)}</span>
       </div>
-      <div style="display:flex;justify-content:space-between;width:100%;font-size:11px;color:var(--text3);">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);">
         <span>${d.count} job${d.count!==1?'s':''}</span>
         <span class="${d.gp>=0?'text-green':'text-red'}">GP ${fmt(d.gp)}</span>
       </div>
     </div>`).join('') || '<div class="text-muted">No data</div>';
-}
 
-// ===================== CLIENT PICKER =====================
-function populateClientDatalist() {
-  const dl = $('client-datalist');
-  if (!dl) return;
-  const sorted = [...(state.contacts||[])].sort((a,b)=>a.name.localeCompare(b.name));
-  dl.innerHTML = sorted.map(ct =>
-    `<option value="${ct.name}">${ct.company && ct.company !== ct.name ? ct.name + ' — ' + ct.company : ct.name}</option>`
-  ).join('');
-}
-
-function getContactByName(name) {
-  return (state.contacts||[]).find(ct =>
-    ct.name.toLowerCase() === name.trim().toLowerCase()
-  );
-}
-
-// Auto-fill lead form phone/email from contacts
-function autoFillClientLead() {
-  const name = $('l-contact').value.trim();
-  const ct = getContactByName(name);
-  if (!ct) return;
-  if (ct.phone && !$('l-phone').value) $('l-phone').value = ct.phone;
-  if (ct.email && !$('l-email').value) $('l-email').value = ct.email;
-}
-
-// Auto-fill job form from contacts (just confirms name is valid)
-function autoFillClientJob() {
-  const name = $('j-client').value.trim();
-  if (!name) return;
-  // silently accept — contact lookup happens on save
-}
-
-// Auto-fill QB client from contacts
-function autoFillClientQB() {
-  const name = $('qb-client').value.trim();
-  if (!name) return;
-  // contact lookup on save — datalist handles suggestions
+  // ── KPI STATS ────────────────────────────────────────────────────────
+  $('dashStats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Total Revenue</div><div class="stat-val green">${fmt(allRevenue)}</div></div>
+    <div class="stat-card"><div class="stat-label">Labour Cost</div><div class="stat-val">${fmt(jobs.reduce((s,j)=>s+(j.lcost||0),0))}</div></div>
+    <div class="stat-card"><div class="stat-label">Material Cost</div><div class="stat-val">${fmt(jobs.reduce((s,j)=>s+(j.mcost||0),0))}</div></div>
+    <div class="stat-card"><div class="stat-label">Avg Margin</div><div class="stat-val ${parseFloat(ytdMargin)>=25?'green':'yellow'}">${ytdMargin}%</div></div>
+  `;
 }
 
 // ===================== CONTACTS =====================
@@ -5051,7 +5254,205 @@ function runPriceImport() {
     </div>`;
 }
 
-// ===================== INIT =====================
+// ===================== PDF EXPORT =====================
+function exportQuotePDF() {
+  const { jsPDF } = window.jspdf;
+  if (!jsPDF) { alert('PDF library not loaded yet, try again in a moment.'); return; }
+  const client  = $('qb-client').value || 'Client';
+  const project = $('qb-project').value || 'Project';
+  const jobCode = $('qb-jobcode').value || '';
+  const markup  = (parseFloat($('qb-markup').value)||30)/100;
+  const labRate = parseFloat($('qb-labrate').value)||95;
+
+  const matLines = state.qbLines.filter(l => !l.isLabour);
+  const labLines = state.qbLines.filter(l => l.isLabour);
+  const matCost  = matLines.reduce((s,l) => s+(l.qty||0)*(l.cost||0), 0);
+  const labHrs   = labLines.reduce((s,l) => s+(l.qty||0), 0);
+  const matSell  = matCost*(1+markup);
+  const labSell  = labHrs*labRate;
+  const subtotal = matSell+labSell;
+  const gst      = subtotal*0.05;
+  const pst      = subtotal*0.07;
+  const total    = subtotal+gst+pst;
+
+  const doc = new jsPDF();
+  const orange = [244,166,35];
+  const dark   = [15,17,23];
+  const gray   = [100,116,139];
+
+  // Header
+  doc.setFillColor(...dark); doc.rect(0,0,210,40,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(22);
+  doc.setTextColor(...orange); doc.text('⚡ PACK OPERATIONS', 14, 18);
+  doc.setFontSize(10); doc.setTextColor(200,200,200);
+  doc.text('Electrical Contractor · Spallumcheen, BC', 14, 26);
+  doc.setFontSize(18); doc.setTextColor(255,255,255);
+  doc.text('QUOTE', 170, 18, { align:'right' });
+  doc.setFontSize(10); doc.setTextColor(200,200,200);
+  doc.text(new Date().toLocaleDateString('en-CA'), 170, 26, { align:'right' });
+
+  // Bill To + Job Info
+  doc.setFontSize(9); doc.setTextColor(...gray); doc.text('BILL TO', 14, 52);
+  doc.setFontSize(13); doc.setTextColor(...dark); doc.setFont('helvetica','bold');
+  doc.text(client, 14, 60);
+  doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.setTextColor(...gray);
+  doc.text(project, 14, 67);
+  if (jobCode) doc.text('Job #: ' + jobCode, 14, 74);
+
+  // Line items table
+  const tableData = [];
+  if (matLines.length) {
+    tableData.push([{content:'MATERIALS', colSpan:4, styles:{fontStyle:'bold', fillColor:[240,240,240], textColor:dark}}]);
+    matLines.forEach(l => {
+      const sell = (l.qty||0)*(l.cost||0)*(1+markup);
+      tableData.push([l.label, l.qty, '$'+(l.cost*(1+markup)).toFixed(2), '$'+sell.toFixed(2)]);
+    });
+  }
+  if (labLines.length) {
+    tableData.push([{content:'LABOUR', colSpan:4, styles:{fontStyle:'bold', fillColor:[240,240,240], textColor:dark}}]);
+    const byAssembly = {};
+    labLines.forEach(l => { const k=l.assemblyName||'Labour'; if(!byAssembly[k])byAssembly[k]=0; byAssembly[k]+=(l.qty||0); });
+    Object.entries(byAssembly).forEach(([name,hrs]) => {
+      tableData.push([name, hrs+'h', '$'+labRate+'/hr', '$'+(hrs*labRate).toFixed(2)]);
+    });
+  }
+
+  doc.autoTable({
+    startY: 82,
+    head: [['Description','Qty','Rate','Amount']],
+    body: tableData,
+    theme: 'grid',
+    headStyles: { fillColor: dark, textColor: 255, fontSize: 9 },
+    bodyStyles: { fontSize: 9, textColor: dark },
+    columnStyles: { 2:{halign:'right'}, 3:{halign:'right'} },
+    margin: { left:14, right:14 }
+  });
+
+  // Totals
+  const finalY = doc.lastAutoTable.finalY + 8;
+  const tRows  = [
+    ['Subtotal', '$'+subtotal.toFixed(2)],
+    ['GST (5%)', '$'+gst.toFixed(2)],
+    ['PST (7%)', '$'+pst.toFixed(2)],
+  ];
+  doc.autoTable({
+    startY: finalY, body: tRows,
+    theme: 'plain',
+    bodyStyles: { fontSize: 10 },
+    columnStyles: { 0:{cellWidth:130, textColor:gray}, 1:{cellWidth:30, halign:'right', textColor:dark} },
+    margin: { left:80, right:14 }
+  });
+
+  // Grand total
+  const totY = doc.lastAutoTable.finalY + 4;
+  doc.setFillColor(...orange); doc.roundedRect(140, totY, 56, 14, 3, 3, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(0,0,0);
+  doc.text('$'+total.toFixed(2), 168, totY+9, { align:'center' });
+  doc.setFontSize(9); doc.setTextColor(...gray); doc.text('TOTAL (incl. taxes)', 168, totY+4, { align:'center' });
+
+  // Footer
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...gray);
+  doc.text('Thank you for your business. This quote is valid for 30 days.', 105, 285, { align:'center' });
+
+  const fname = `PackOps_Quote_${client.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+  doc.save(fname);
+}
+
+// ===================== AI QUOTE DESCRIPTION =====================
+async function aiGenerateQuoteDesc() {
+  const client   = $('qb-client').value || '';
+  const jobtype  = $('qb-jobtype').value || '';
+  const existing = $('qb-project').value || '';
+  const apiKey   = await loadAnthropicKey();
+
+  if (!apiKey) {
+    alert('Add your Anthropic API key in ⚙️ Settings first.');
+    return;
+  }
+
+  const btn = document.querySelector('[onclick="aiGenerateQuoteDesc()"]');
+  if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+
+  // Build context from line items
+  const assemblies = [...new Set(state.qbLines.map(l=>l.assemblyName).filter(Boolean))];
+  const materials  = state.qbLines.filter(l=>!l.isLabour).map(l=>l.label).slice(0,8);
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-allow-browser': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 200,
+        messages: [{
+          role: 'user',
+          content: `Write a professional one-sentence project description for an electrical contractor quote.
+Client: ${client || 'residential client'}
+Job type: ${jobtype || 'electrical work'}
+Assemblies: ${assemblies.join(', ') || 'general electrical'}
+Key materials: ${materials.join(', ') || ''}
+${existing ? 'Existing description: ' + existing : ''}
+
+Reply with ONLY the description, no quotes, no prefix. Keep it under 20 words. Professional trades language.`
+        }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.[0]?.text?.trim();
+    if (text) $('qb-project').value = text;
+  } catch(e) {
+    alert('Could not generate description: ' + e.message);
+  } finally {
+    if (btn) { btn.textContent = '✨ AI Write'; btn.disabled = false; }
+  }
+}
+
+// ===================== PWA INSTALL =====================
+let _pwaInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _pwaInstallPrompt = e;
+  // Show install button in settings if available
+  const el = $('pwa-install-btn');
+  if (el) el.style.display = 'block';
+});
+
+function installPWA() {
+  if (_pwaInstallPrompt) {
+    _pwaInstallPrompt.prompt();
+    _pwaInstallPrompt.userChoice.then(r => {
+      if (r.outcome === 'accepted') {
+        const el = $('pwa-install-btn');
+        if (el) el.style.display = 'none';
+      }
+    });
+  } else {
+    alert('To install:\n📱 iPhone/iPad: tap Share → "Add to Home Screen"\n🤖 Android/Chrome: tap menu → "Add to Home Screen" or "Install App"');
+  }
+}
+
+// Register service worker for offline support
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    // Inline service worker — caches the app for offline use
+    const swCode = `
+const CACHE = 'packops-v1';
+const ASSETS = [location.href];
+self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS))));
+self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));
+    `;
+    const blob = new Blob([swCode], {type:'application/javascript'});
+    const url  = URL.createObjectURL(blob);
+    navigator.serviceWorker.register(url).catch(() => {});
+  });
+}
+
+
 // Wrap in async IIFE so we can await loadData before rendering
 (async () => {
   // Show loading state
