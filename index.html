@@ -4834,9 +4834,10 @@ self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r
 }
 
 
+// ===================== INIT =====================
 // Wrap in async IIFE so we can await loadData before rendering
 (async () => {
-  // Show loading state
+  // Show loading state immediately
   const si = $('save-indicator');
   if (si) { si.style.display='inline'; si.textContent='⏳ Loading...'; si.style.color='var(--yellow)'; }
 
@@ -4844,10 +4845,29 @@ self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r
   if (!state.timeEntries) state.timeEntries = [];
   if (!state.contacts) state.contacts = [];
 
-  // Load data — waits for Supabase before rendering
-  await loadData();
+  // ALWAYS pull fresh from Supabase on every page open — never show stale data
+  try {
+    const row = await supabaseLoad();
+    if (row && row.data) {
+      applySnapshot(row.data);
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(row.data)); } catch(e) {}
+      _lastSyncAt = row.updated_at;
+      if (si) { si.style.display='inline'; si.textContent='✓ Up to date'; si.style.color='var(--green)'; setTimeout(()=>{ if(si) si.style.display='none'; }, 2000); }
+    } else {
+      // No Supabase data — try localStorage
+      const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('packops_data');
+      if (raw) { try { applySnapshot(JSON.parse(raw)); } catch(e) {} }
+      if (si) { si.style.display='none'; }
+    }
+  } catch(err) {
+    // Offline — use localStorage
+    console.warn('Supabase load failed, using localStorage:', err.message);
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('packops_data');
+    if (raw) { try { applySnapshot(JSON.parse(raw)); } catch(e) {} }
+    if (si) { si.style.display='inline'; si.textContent='💾 Offline mode'; si.style.color='var(--text3)'; setTimeout(()=>{ if(si) si.style.display='none'; }, 3000); }
+  }
 
-  // Now render with real data
+  // Render everything with fresh data
   populateClientDatalist();
   renderDashboard();
   updateNextJobDisplay();
@@ -4855,19 +4875,27 @@ self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r
   $('e-date').value = new Date().toISOString().split('T')[0];
   $('tl-date') && ($('tl-date').value = new Date().toISOString().split('T')[0]);
 
-  // Show last saved time in sidebar footer
+  // Show last synced time in sidebar
   try {
     const footer = $('sidebar-footer');
     if (footer && _lastSyncAt) {
       const d = new Date(_lastSyncAt);
-      footer.innerHTML += `<div style="margin-top:4px;font-size:10px;color:var(--text3);">Synced: ${d.toLocaleString('en-CA',{dateStyle:'short',timeStyle:'short'})}</div>`;
+      const timeStr = d.toLocaleString('en-CA', { dateStyle:'short', timeStyle:'short' });
+      const existing = footer.querySelector('.sync-time');
+      if (existing) existing.remove();
+      const el = document.createElement('div');
+      el.className = 'sync-time';
+      el.style.cssText = 'margin-top:4px;font-size:10px;color:var(--text3);';
+      el.textContent = 'Synced: ' + timeStr;
+      footer.appendChild(el);
     }
   } catch(e) {}
-  // Auto-sync every 30 seconds — picks up changes Ryley made
+
+  // Auto-refresh every 30 seconds — picks up changes Ryley made without any button press
   setInterval(async () => {
     try {
       const row = await supabaseLoad();
-      if (row && row.updated_at && row.updated_at !== _lastSyncAt) {
+      if (row && row.data && row.updated_at !== _lastSyncAt) {
         applySnapshot(row.data);
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(row.data)); } catch(e) {}
         _lastSyncAt = row.updated_at;
@@ -4879,11 +4907,11 @@ self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r
           const id = activePage.id.replace('page-','');
           if (id !== 'dashboard') renderPage(id);
         }
-        const si = $('save-indicator');
-        if (si) { si.style.display='inline'; si.textContent='🔄 Updated'; si.style.color='var(--blue)'; setTimeout(()=>{si.style.display='none';},3000); }
-        console.log('Auto-synced new changes from cloud');
+        // Subtle indicator — doesn't interrupt what you're doing
+        const si2 = $('save-indicator');
+        if (si2) { si2.style.display='inline'; si2.textContent='🔄 Updated'; si2.style.color='var(--blue)'; setTimeout(()=>{ si2.style.display='none'; }, 2500); }
       }
-    } catch(e) { /* silent fail — no internet or table doesn't exist yet */ }
+    } catch(e) { /* silent — offline is fine */ }
   }, 30000);
 })();
 
