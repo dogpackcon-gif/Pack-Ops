@@ -5117,35 +5117,29 @@ if (document.readyState === 'loading') {
 
 // Belt-and-suspenders: also run on window load if state is still empty
 window.addEventListener('load', () => {
-  setTimeout(() => {
-    const s = document.createElement('script');
-    s.textContent = `
-      if (!state.jobs || state.jobs.length === 0) {
-        (async () => {
-          const row = await supabaseLoad();
-          if (row && row.data) {
-            applySnapshot(row.data);
-            _lastSyncAt = row.updated_at;
-            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(row.data)); } catch(e) {}
-            populateClientDatalist();
-            renderDashboard();
-            updateNextJobDisplay();
-            const si = document.getElementById('save-indicator');
-            if (si) { si.style.display='inline'; si.textContent='✓ Up to date'; si.style.color='var(--green)'; setTimeout(()=>si.style.display='none', 2000); }
-          } else {
-            const raw = localStorage.getItem('packops_v1');
-            if (raw && state.jobs.length === 0) {
-              applySnapshot(JSON.parse(raw));
-              populateClientDatalist();
-              renderDashboard();
-              updateNextJobDisplay();
-            }
-          }
-        })();
+  setTimeout(async () => {
+    if (!state.jobs || state.jobs.length === 0) {
+      try {
+        const row = await supabaseLoad();
+        if (row && row.data) {
+          applySnapshot(row.data);
+          _lastSyncAt = row.updated_at;
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(row.data)); } catch(e) {}
+        } else {
+          const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('packops_data');
+          if (raw) applySnapshot(JSON.parse(raw));
+        }
+      } catch(e) {
+        const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('packops_data');
+        if (raw) try { applySnapshot(JSON.parse(raw)); } catch(e2) {}
       }
-    `;
-    document.head.appendChild(s);
-  }, 100);
+      populateClientDatalist();
+      renderDashboard();
+      updateNextJobDisplay();
+      const si = $('save-indicator');
+      if (si) { si.style.display='inline'; si.textContent=_lastSyncAt?'✓ Up to date':'💾 Offline'; si.style.color=_lastSyncAt?'var(--green)':'var(--text3)'; setTimeout(()=>si.style.display='none', 2000); }
+    }
+  }, 200);
 });
 </script>
 
