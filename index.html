@@ -1619,6 +1619,15 @@ let state = {
   editIdx: { leads: null, quotes: null, jobs: null, materials: null, contacts: null }
 };
 
+// ===================== SUPABASE SYNC =====================
+const SUPABASE_URL = 'https://bktlwcqllvxkxbeibrhl.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJrdGx3Y3FsbHZ4a3hiZWlicmhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNDg1MDQsImV4cCI6MjA4OTcyNDUwNH0.5DB2nZ7kRMyY8Zyc2ihFTcbUSHVIZfXvnlg129nMIGo';
+const STORAGE_KEY  = 'packops_v1';
+let _syncTimeout   = null;
+let _lastSyncAt    = null;
+let _syncStatus    = 'idle'; // idle | saving | saved | error
+
+
 // ---- DATA LOADED FROM SUPABASE ON INIT ---- 
 
 // ===================== HELPERS =====================
@@ -3754,14 +3763,6 @@ function saveTimeLog() {
 
 // ===================== LOCALSTORAGE =====================
 // ===================== LOCALSTORAGE + DATA =====================
-
-// ===================== SUPABASE SYNC =====================
-const SUPABASE_URL = 'https://bktlwcqllvxkxbeibrhl.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJrdGx3Y3FsbHZ4a3hiZWlicmhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNDg1MDQsImV4cCI6MjA4OTcyNDUwNH0.5DB2nZ7kRMyY8Zyc2ihFTcbUSHVIZfXvnlg129nMIGo';
-const STORAGE_KEY  = 'packops_v1';
-let _syncTimeout   = null;
-let _lastSyncAt    = null;
-let _syncStatus    = 'idle'; // idle | saving | saved | error
 
 function setSyncStatus(status, msg) {
   _syncStatus = status;
