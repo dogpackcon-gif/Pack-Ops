@@ -5027,6 +5027,7 @@ self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r
 function watchState() { /* state is saved explicitly via saveData() */ }
 
 // ===================== INIT =====================
+function __runApp() {
 (async () => {
   // Show loading overlay — blocks rendering until real data arrives
   const overlay = document.createElement('div');
@@ -5106,6 +5107,13 @@ function watchState() { /* state is saved explicitly via saveData() */ }
     } catch(e) {}
   }, 30000);
 })();
+}
+// Run after DOM is fully ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', __runApp);
+} else {
+  __runApp();
+}
 </script>
 
 <!-- Client datalist for all forms -->
