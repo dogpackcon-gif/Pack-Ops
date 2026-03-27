@@ -3625,15 +3625,24 @@ async function supabaseSave(snapshot) {
 }
 
 async function supabaseLoad() {
-  const res = await fetch(SUPABASE_URL + '/rest/v1/app_state?id=eq.packops&select=data,updated_at', {
-    headers: {
-      'apikey':        SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_KEY
-    }
-  });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  const rows = await res.json();
-  return rows && rows.length ? rows[0] : null;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+  try {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/app_state?id=eq.packops&select=data,updated_at', {
+      signal: controller.signal,
+      headers: {
+        'apikey':        SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY
+      }
+    });
+    clearTimeout(timeout);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    return rows && rows.length ? rows[0] : null;
+  } catch(e) {
+    clearTimeout(timeout);
+    throw e;
+  }
 }
 
 function getStateSnapshot() {
@@ -4835,8 +4844,12 @@ self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r
 
 
 // ===================== INIT =====================
-// Wrap in async IIFE so we can await loadData before rendering
+// Wait for DOM to be fully ready before loading
+window.addEventListener('DOMContentLoaded', () => {}, false);
 (async () => {
+  // Small delay to ensure DOM elements exist
+  await new Promise(r => setTimeout(r, 50));
+
   // Show loading state immediately
   const si = $('save-indicator');
   if (si) { si.style.display='inline'; si.textContent='⏳ Loading...'; si.style.color='var(--yellow)'; }
