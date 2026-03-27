@@ -347,6 +347,60 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 /* Hide old table on all screen sizes for these pages */
 #leads-table thead, #quotes-table thead, #jobs-table thead { display: none; }
 
+.topbar-meta { display:flex; align-items:center; gap:10px; margin-right:6px; }
+.topbar-pulse {
+  display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px;
+  background:linear-gradient(180deg, rgba(244,166,35,0.12), rgba(244,166,35,0.05));
+  border:1px solid rgba(244,166,35,0.25); color:var(--text2); font-size:11px;
+  letter-spacing:0.6px; text-transform:uppercase;
+}
+.topbar-dot { width:8px; height:8px; border-radius:50%; background:var(--green); box-shadow:0 0 0 4px rgba(34,197,94,0.15); }
+.utility-search { min-width:280px; max-width:420px; width:36vw; position:relative; }
+.utility-search input {
+  width:100%; background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+  border:1px solid var(--border); color:var(--text); padding:9px 74px 9px 38px; border-radius:10px;
+  font-size:13px; outline:none; font-family:'Barlow', sans-serif;
+}
+.utility-search input:focus { border-color:var(--accent); box-shadow:0 0 0 4px rgba(244,166,35,0.12); }
+.utility-search::before {
+  content:'⌘'; position:absolute; left:12px; top:50%; transform:translateY(-52%);
+  color:var(--accent); font-size:12px; font-weight:700;
+}
+.utility-search .utility-hint { position:absolute; right:10px; top:50%; transform:translateY(-50%); color:var(--text3); font-size:11px; }
+.dashboard-section-grid { display:grid; grid-template-columns:1.2fr 0.8fr; gap:16px; margin-bottom:16px; }
+.mini-list { display:grid; gap:10px; padding:14px; }
+.mini-item {
+  display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px 14px;
+  border:1px solid rgba(255,255,255,0.05); background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+  border-radius:12px;
+}
+.mini-item-main { min-width:0; }
+.mini-item-title { font-weight:700; font-size:13px; }
+.mini-item-sub { color:var(--text3); font-size:12px; margin-top:3px; }
+.mini-item-value { text-align:right; font-size:12px; color:var(--text2); white-space:nowrap; }
+.mini-pill {
+  display:inline-flex; align-items:center; gap:6px; padding:4px 9px; border-radius:999px;
+  font-size:11px; font-weight:700; letter-spacing:0.4px; text-transform:uppercase;
+}
+.mini-pill.warn { background:rgba(234,179,8,0.16); color:var(--yellow); }
+.mini-pill.info { background:rgba(59,130,246,0.16); color:var(--blue); }
+.mini-pill.good { background:rgba(34,197,94,0.16); color:var(--green); }
+.command-input {
+  width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text);
+  padding:14px 16px; border-radius:12px; font-size:15px; outline:none; font-family:'Barlow', sans-serif;
+}
+.command-input:focus { border-color:var(--accent); box-shadow:0 0 0 4px rgba(244,166,35,0.12); }
+.command-results { display:grid; gap:8px; margin-top:14px; max-height:55vh; overflow-y:auto; }
+.command-item { padding:12px 14px; border-radius:12px; border:1px solid rgba(255,255,255,0.05); background:var(--surface2); cursor:pointer; }
+.command-item:hover, .command-item.active { border-color:rgba(244,166,35,0.35); background:rgba(244,166,35,0.08); }
+.command-item-title { display:flex; align-items:center; justify-content:space-between; gap:12px; font-weight:700; font-size:14px; }
+.command-item-sub { margin-top:4px; color:var(--text3); font-size:12px; }
+
+@media (max-width:768px) {
+  .topbar-meta { display:none; }
+  .dashboard-section-grid { grid-template-columns:1fr; }
+}
+
 </style>
 </head>
 <body>
@@ -416,6 +470,13 @@ textarea.form-control { resize: vertical; min-height: 80px; }
     <div class="topbar">
       <div class="page-title" id="pageTitle">Dashboard</div>
       <div class="topbar-actions" id="topbarActions">
+        <div class="topbar-meta hide-mobile">
+          <div class="topbar-pulse"><span class="topbar-dot"></span><span id="topbar-cloud-status">Cloud Ready</span></div>
+          <div class="utility-search" onclick="openCommandPalette()">
+            <input id="global-search-input" type="text" placeholder="Search jobs, leads, contacts, materials..." readonly>
+            <span class="utility-hint">Cmd+K</span>
+          </div>
+        </div>
         <span id="save-indicator" style="font-size:11px;color:var(--text3);display:none;">✓ Saved</span>
         <button class="btn btn-ghost btn-sm" onclick="syncNow()" title="Pull latest from cloud">🔄 Sync</button>
         <button class="btn btn-ghost btn-sm" onclick="exportData()" title="Export backup">⬇ Export</button>
@@ -481,6 +542,17 @@ textarea.form-control { resize: vertical; min-height: 80px; }
           <div class="table-card">
             <div class="table-header"><span class="table-title">📊 By Job Type</span></div>
             <div id="dashByType" style="padding:14px;font-size:13px;"></div>
+          </div>
+        </div>
+
+        <div class="dashboard-section-grid dash-grid-2">
+          <div class="table-card">
+            <div class="table-header"><span class="table-title">🎯 Follow Up Queue</span></div>
+            <div id="dashFollowups" class="mini-list"></div>
+          </div>
+          <div class="table-card">
+            <div class="table-header"><span class="table-title">🕘 Recent Activity</span></div>
+            <div id="dashActivity" class="mini-list"></div>
           </div>
         </div>
 
@@ -1627,6 +1699,9 @@ let _syncTimeout   = null;
 let _lastSyncAt    = null;
 let _syncStatus    = 'idle'; // idle | saving | saved | error
 let _pullInFlight  = null;
+let _currentPage   = 'dashboard';
+let _commandItems  = [];
+let _commandActiveIndex = 0;
 
 
 // ---- DATA LOADED FROM SUPABASE ON INIT ---- 
@@ -1646,6 +1721,23 @@ function populateClientDatalist() {
 }
 
 function showPage(id) {
+  _currentPage = id;
+  try { localStorage.setItem('packops_last_page', id); } catch(e) {}
+  const titles = {
+    dashboard:'Dashboard',
+    contacts:'Contacts',
+    leads:'Leads',
+    quotes:'Quotes',
+    jobs:'Jobs',
+    timetracking:'Time Tracking',
+    invoicehistory:'Invoices',
+    materials:'Materials',
+    assemblies:'Assemblies',
+    priceimport:'Price Import',
+    settings:'Settings',
+    quotebuilder:'Quote Builder'
+  };
+  if ($('pageTitle')) $('pageTitle').textContent = titles[id] || 'Pack Ops';
   // Hide all pages
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   // Show target page
@@ -1694,6 +1786,81 @@ function statusBadge(s) {
   if (b.includes(s)) return `<span class="badge badge-blue">${s}</span>`;
   if (a.includes(s)) return `<span class="badge badge-accent">${s}</span>`;
   return `<span class="badge badge-gray">${s||'—'}</span>`;
+}
+
+function commandLabel(type) {
+  if (type === 'job') return 'Job';
+  if (type === 'lead') return 'Lead';
+  if (type === 'quote') return 'Quote';
+  if (type === 'contact') return 'Contact';
+  if (type === 'material') return 'Material';
+  return 'Page';
+}
+
+function buildCommandItems(query = '') {
+  const q = query.trim().toLowerCase();
+  const pages = [
+    { type:'page', title:'Dashboard', sub:'Overview, alerts, and KPIs', run:()=>showPage('dashboard') },
+    { type:'page', title:'Jobs', sub:'Open active jobs and job detail', run:()=>showPage('jobs') },
+    { type:'page', title:'Quotes', sub:'Open quote builder and saved quotes', run:()=>showPage('quotes') },
+    { type:'page', title:'Leads', sub:'Sales pipeline and follow-up queue', run:()=>showPage('leads') },
+    { type:'page', title:'Contacts', sub:'Client directory and history', run:()=>showPage('contacts') },
+    { type:'page', title:'Materials', sub:'Material master and invoice entries', run:()=>showPage('materials') },
+    { type:'page', title:'Time Tracking', sub:'Labour logs and hours by job', run:()=>showPage('timetracking') },
+    { type:'page', title:'Settings', sub:'Business defaults, logo, and integrations', run:()=>showPage('settings') },
+    { type:'page', title:'New Job', sub:'Create a fresh job', run:()=>openNewJob() },
+    { type:'page', title:'New Lead', sub:'Capture a new opportunity', run:()=>openModal('modal-lead') },
+    { type:'page', title:'New Quote', sub:'Start a quote in the builder', run:()=>openNewQuote() },
+    { type:'page', title:'Log Time', sub:'Add labour to a job', run:()=>openModal('modal-timelog') },
+  ];
+  const records = [
+    ...state.jobs.map((j,i)=>({ type:'job', title:`${j.code} ${j.client||''}`.trim(), sub:`${j.status||'No status'} · ${j.desc||'No description'}`, run:()=>viewJobNotes(i) })),
+    ...state.leads.map((l,i)=>({ type:'lead', title:`${l.id} ${l.contact||''}`.trim(), sub:`${l.status||'No status'} · ${l.nextstep||l.desc||'No next step'}`, run:()=>editLead(i) })),
+    ...state.quotes.map((q,i)=>({ type:'quote', title:`${q.id} ${q.client||''}`.trim(), sub:`${q.status||'No status'} · ${fmt(q.total)} · ${q.desc||'No description'}`, run:()=>editQuoteInBuilder(i) })),
+    ...state.contacts.map((c,i)=>({ type:'contact', title:c.name || c.company || 'Unnamed contact', sub:`${c.company||'No company'} · ${c.phone||c.email||'No contact info'}`, run:()=>openEditContact(i) })),
+    ...state.materials.slice(0, 150).map((m,i)=>({ type:'material', title:m.name, sub:`${m.cat||'No category'} · ${fmt(m.cost)} · ${m.id||'No item id'}`, run:()=>{ showPage('materials'); editMaterial(i); } })),
+  ];
+  return [...pages, ...records].filter(item => !q || `${item.title} ${item.sub} ${item.type}`.toLowerCase().includes(q)).slice(0, 18);
+}
+
+function renderCommandResults(query = '') {
+  const results = $('command-results');
+  if (!results) return;
+  _commandItems = buildCommandItems(query);
+  _commandActiveIndex = Math.min(_commandActiveIndex, Math.max(_commandItems.length - 1, 0));
+  results.innerHTML = _commandItems.length ? _commandItems.map((item, index) => `
+    <div class="command-item ${index===_commandActiveIndex?'active':''}" onclick="runCommandItem(${index})">
+      <div class="command-item-title">
+        <span>${item.title}</span>
+        <span class="mini-pill ${item.type==='page'?'info':item.type==='job'?'warn':'good'}">${commandLabel(item.type)}</span>
+      </div>
+      <div class="command-item-sub">${item.sub}</div>
+    </div>
+  `).join('') : `<div class="no-data" style="padding:28px;">No matches found</div>`;
+}
+
+function openCommandPalette() {
+  const modal = $('modal-command');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  const input = $('command-input');
+  if (input) {
+    input.value = '';
+    renderCommandResults('');
+    setTimeout(() => input.focus(), 10);
+  }
+}
+
+function closeCommandPalette() {
+  const modal = $('modal-command');
+  if (modal) modal.classList.add('hidden');
+}
+
+function runCommandItem(index) {
+  const item = _commandItems[index];
+  if (!item) return;
+  closeCommandPalette();
+  item.run();
 }
 
 // ===================== DASHBOARD =====================
@@ -1753,7 +1920,7 @@ function editLead(i) {
   $('l-value').value = l.value; $('l-status').value = l.status; $('l-nextstep').value = l.nextstep; $('l-notes').value = l.notes;
   openModal('modal-lead');
 }
-function deleteLead(i) { if(confirm('Delete this lead?')) { state.leads.splice(i,1); renderLeads(); } }
+function deleteLead(i) { if(confirm('Delete this lead?')) { state.leads.splice(i,1); saveData(); renderLeads(); renderDashboard(); } }
 function saveLead() {
   const contact = $('l-contact').value.trim();
   if (!contact) { alert('Contact name required'); return; }
@@ -1984,35 +2151,6 @@ function renderQuotes(filter='') {
     </td></tr>`;
   }).join('');
 }
-    tbody.innerHTML = data.map(q => {
-      const idx = state.quotes.indexOf(q);
-      return `<tr><td colspan="12" style="padding:0;border:none;">
-        <div class="job-card">
-          <div class="job-card-top">
-            <div>
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:var(--accent);">${q.id}</span>
-                ${statusBadge(q.status)}
-              </div>
-              <div style="font-weight:600;font-size:15px;margin-top:2px;">${q.client||'—'}</div>
-            </div>
-            <div style="text-align:right;">
-              <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:var(--green);">${fmt(q.total)}</div>
-              <div style="font-size:11px;color:var(--text3);">${q.date||''}</div>
-            </div>
-          </div>
-          ${q.desc ? `<div class="job-card-desc">${q.desc}</div>` : ''}
-          <div style="font-size:12px;color:var(--text3);margin-bottom:6px;">${q.hrs||0}h labour · ${fmt(q.material)} materials</div>
-          <div class="job-card-bottom">
-            <div style="font-size:12px;color:var(--text3);">${q.jobtype||'—'}${q.jobCode ? ' · Job '+q.jobCode : ''}</div>
-            <div style="display:flex;gap:6px;">
-              <button class="btn btn-primary btn-sm" onclick="editQuoteInBuilder(${idx})">Edit</button>
-              <button class="btn btn-danger btn-sm" onclick="deleteQuote(${idx})">✕</button>
-            </div>
-          </div>
-        </div>
-      </td></tr>`;
-    }).join('');
 
 function editQuote(i) {
   const q = state.quotes[i]; state.editIdx.quotes = i;
@@ -2023,7 +2161,7 @@ function editQuote(i) {
   $('q-markup').value=q.markup; $('q-status').value=q.status; $('q-notes').value=q.notes;
   openModal('modal-quote');
 }
-function deleteQuote(i) { if(confirm('Delete?')) { state.quotes.splice(i,1); renderQuotes(); } }
+function deleteQuote(i) { if(confirm('Delete?')) { state.quotes.splice(i,1); saveData(); renderQuotes(); renderDashboard(); } }
 function saveQuote() {
   const m = parseFloat($('q-markup').value)/100 || 0.3;
   const labour = parseFloat($('q-labour').value)||0;
@@ -2230,6 +2368,8 @@ function renderMaterials(filter='', catFilter='') {
     <td>${e.review==='Yes'?'<span class="badge badge-yellow">Yes</span>':'<span class="badge badge-gray">No</span>'}</td>
   </tr>`).join('') || `<tr><td colspan="10" class="no-data">No entries</td></tr>`;
 }
+function filterMaterials(v) { renderMaterials(v, $('matCatFilter') ? $('matCatFilter').value : ''); }
+function matTab(t, el) { showMaterialTab(t); }
 function filterMaterialCategory(v) { renderMaterials('', v); }
 function showMaterialTab(t) {
   $('mat-tab-master').style.display = t==='master' ? '' : 'none';
@@ -2241,7 +2381,7 @@ function editMaterial(i) {
   $('m-cat').value=m.cat; $('m-id').value=m.id; $('m-name').value=m.name; $('m-cost').value=m.cost;
   openModal('modal-material');
 }
-function deleteMaterial(i) { if(confirm('Delete?')) { state.materials.splice(i,1); renderMaterials(); } }
+function deleteMaterial(i) { if(confirm('Delete?')) { state.materials.splice(i,1); saveData(); renderMaterials(); } }
 function saveMaterial() {
   const name = $('m-name').value.trim();
   if (!name) { alert('Item name required'); return; }
@@ -2380,7 +2520,7 @@ function editAssembly(i) {
   openModal('modal-assembly');
   $('modal-assembly').dataset.editIdx = i;
 }
-function deleteAssembly(i) { if(confirm('Delete assembly?')) { state.assemblies.splice(i,1); renderAssemblies(); } }
+function deleteAssembly(i) { if(confirm('Delete assembly?')) { state.assemblies.splice(i,1); saveData(); renderAssemblies(); } }
 function addAssemblyItem() { addAssemblyItemRow('','1',''); }
 function addAssemblyItemRow(item='', qty=1, cost='') {
   const tr = document.createElement('tr');
@@ -3639,11 +3779,57 @@ function saveSettings() {
   flashMsg('settings-key-status', '✓ Settings saved!', 'var(--green)');
 }
 
+function exportData() {
+  const snapshot = getStateSnapshot();
+  snapshot.savedAt = new Date().toISOString();
+  const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = snapshot.savedAt.replace(/[:T]/g, '-').slice(0, 16);
+  a.href = url;
+  a.download = `packops-backup-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function triggerImport() {
+  $('import-file-input')?.click();
+}
+
+function importData(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      if (!parsed || typeof parsed !== 'object') throw new Error('Invalid file');
+      applySnapshot(parsed);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        localStorage.setItem('packops_last_sync', new Date().toISOString());
+      } catch(e) {}
+      rerenderApp();
+      saveData();
+      setSyncStatus('saved');
+    } catch (err) {
+      alert('Import failed: ' + err.message);
+    } finally {
+      event.target.value = '';
+    }
+  };
+  reader.readAsText(file);
+}
+
 function clearAllData() {
   if (!confirm('This will delete ALL jobs, leads, quotes, invoices, and time entries.\n\nAre you absolutely sure?')) return;
   if (!confirm('Last chance — this cannot be undone. Clear everything?')) return;
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem('packops_data');
+  localStorage.removeItem('packops_last_sync');
+  localStorage.removeItem('packops_last_page');
   location.reload();
 }
 
@@ -3678,6 +3864,20 @@ const MODAL_ENTER_MAP = {
 };
 
 document.addEventListener('keydown', function(e) {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    openCommandPalette();
+    return;
+  }
+  if (e.key === '/' && !['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) {
+    e.preventDefault();
+    openCommandPalette();
+    return;
+  }
+  if (e.key === 'Escape' && $('modal-command') && !$('modal-command').classList.contains('hidden')) {
+    closeCommandPalette();
+    return;
+  }
   if (e.key !== 'Enter') return;
   // Don't fire on textarea
   if (e.target.tagName === 'TEXTAREA') return;
@@ -3692,6 +3892,30 @@ document.addEventListener('keydown', function(e) {
       window[saveFn]();
       return;
     }
+  }
+});
+
+document.addEventListener('input', function(e) {
+  if (e.target && e.target.id === 'command-input') {
+    _commandActiveIndex = 0;
+    renderCommandResults(e.target.value);
+  }
+});
+
+document.addEventListener('keydown', function(e) {
+  const modal = $('modal-command');
+  if (!modal || modal.classList.contains('hidden')) return;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _commandActiveIndex = Math.min(_commandActiveIndex + 1, Math.max(_commandItems.length - 1, 0));
+    renderCommandResults($('command-input')?.value || '');
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _commandActiveIndex = Math.max(_commandActiveIndex - 1, 0);
+    renderCommandResults($('command-input')?.value || '');
+  } else if (e.key === 'Enter' && document.activeElement === $('command-input')) {
+    e.preventDefault();
+    runCommandItem(_commandActiveIndex);
   }
 });
 
@@ -3768,12 +3992,22 @@ function saveTimeLog() {
 function setSyncStatus(status, msg) {
   _syncStatus = status;
   const el = $('save-indicator');
+  const cloud = $('topbar-cloud-status');
   if (!el) return;
   el.style.display = 'inline';
-  if (status === 'saving') { el.textContent = '⏳ Syncing...'; el.style.color = 'var(--yellow)'; }
-  else if (status === 'saved') { el.textContent = '✓ Synced'; el.style.color = 'var(--green)'; setTimeout(()=>{el.style.display='none';}, 3000); }
-  else if (status === 'error') { el.textContent = '⚠ ' + (msg||'Sync error'); el.style.color = 'var(--red)'; }
-  else if (status === 'offline') { el.textContent = '💾 Saved locally'; el.style.color = 'var(--text3)'; setTimeout(()=>{el.style.display='none';}, 2000); }
+  if (status === 'saving') {
+    el.textContent = '⏳ Syncing...'; el.style.color = 'var(--yellow)';
+    if (cloud) cloud.textContent = 'Syncing';
+  } else if (status === 'saved') {
+    el.textContent = '✓ Synced'; el.style.color = 'var(--green)'; setTimeout(()=>{el.style.display='none';}, 3000);
+    if (cloud) cloud.textContent = 'Cloud Ready';
+  } else if (status === 'error') {
+    el.textContent = '⚠ ' + (msg||'Sync error'); el.style.color = 'var(--red)';
+    if (cloud) cloud.textContent = 'Needs Attention';
+  } else if (status === 'offline') {
+    el.textContent = '💾 Saved locally'; el.style.color = 'var(--text3)'; setTimeout(()=>{el.style.display='none';}, 2000);
+    if (cloud) cloud.textContent = 'Local Only';
+  }
 }
 
 async function supabaseSave(snapshot, updatedAt = new Date().toISOString()) {
@@ -4211,6 +4445,53 @@ function renderDashboard() {
         <span class="${d.gp>=0?'text-green':'text-red'}">GP ${fmt(d.gp)}</span>
       </div>
     </div>`).join('') || '<div class="text-muted">No data</div>';
+
+  const followups = [
+    ...leads.filter(l => ['Follow Up','Quote Sent','Waiting to Quote'].includes(l.status)).map(l => ({
+      title: l.contact || l.id,
+      sub: `${l.status || 'Lead'} · ${l.nextstep || l.desc || 'Needs attention'}`,
+      value: l.value ? fmt(l.value) : 'Lead',
+      pill: l.status === 'Quote Sent' ? 'warn' : 'info'
+    })),
+    ...unpaidJobs.slice(0, 4).map(j => ({
+      title: `${j.code} ${j.client}`,
+      sub: `${j.status || 'Unpaid'} · waiting on payment`,
+      value: fmt(j.revenue || 0),
+      pill: 'warn'
+    }))
+  ].slice(0, 6);
+
+  $('dashFollowups').innerHTML = followups.length ? followups.map(item => `
+    <div class="mini-item">
+      <div class="mini-item-main">
+        <div class="mini-item-title">${item.title}</div>
+        <div class="mini-item-sub">${item.sub}</div>
+      </div>
+      <div class="mini-item-value">
+        <div class="mini-pill ${item.pill}">${item.value}</div>
+      </div>
+    </div>
+  `).join('') : `<div class="empty-state" style="padding:24px 12px;"><div class="es-icon">✅</div><div class="es-title">Nothing urgent right now</div></div>`;
+
+  const activity = [
+    ...jobs.map(j => ({ when:j.date, title:`Job ${j.code}`, sub:`${j.client || 'No client'} · ${j.status || 'No status'}` })),
+    ...quotes.map(q => ({ when:q.date, title:`Quote ${q.id}`, sub:`${q.client || 'No client'} · ${fmt(q.total)}` })),
+    ...leads.map(l => ({ when:l.date, title:`Lead ${l.id}`, sub:`${l.contact || 'No contact'} · ${l.status || 'No status'}` })),
+    ...(state.timeEntries || []).map(t => ({ when:t.date, title:`Time ${t.job}`, sub:`${t.employee || 'Unknown'} · ${(t.hours||0).toFixed(1)}h ${t.type || ''}`.trim() }))
+  ]
+    .filter(x => x.when)
+    .sort((a,b) => String(b.when).localeCompare(String(a.when)))
+    .slice(0, 6);
+
+  $('dashActivity').innerHTML = activity.length ? activity.map(item => `
+    <div class="mini-item">
+      <div class="mini-item-main">
+        <div class="mini-item-title">${item.title}</div>
+        <div class="mini-item-sub">${item.sub}</div>
+      </div>
+      <div class="mini-item-value">${item.when}</div>
+    </div>
+  `).join('') : `<div class="empty-state" style="padding:24px 12px;"><div class="es-icon">🕘</div><div class="es-title">No recent activity yet</div></div>`;
 
   // ── KPI STATS ────────────────────────────────────────────────────────
   $('dashStats').innerHTML = `
@@ -5110,9 +5391,12 @@ function __runApp() {
     populateClientDatalist();
     renderDashboard();
     updateNextJobDisplay();
+    const rememberedPage = localStorage.getItem('packops_last_page');
+    if (rememberedPage && rememberedPage !== 'dashboard') showPage(rememberedPage);
     $('qb-assembly-select') && $('qb-assembly-select').addEventListener('change', updateAssemblyPreview);
     $('e-date') && ($('e-date').value = new Date().toISOString().split('T')[0]);
     $('tl-date') && ($('tl-date').value = new Date().toISOString().split('T')[0]);
+    renderCommandResults('');
 
     // === STEP 2: Background cloud sync — runs after UI is visible ===
     setTimeout(async () => {
@@ -5171,6 +5455,18 @@ if (document.readyState === 'loading') {
       <button class="modal-close" onclick="closeModal('modal-scope')">✕</button>
     </div>
     <div id="scope-modal-body" style="padding:20px;"></div>
+  </div>
+</div>
+<div class="modal-overlay hidden" id="modal-command" onclick="if(event.target===this)closeCommandPalette()">
+  <div class="modal" style="max-width:720px;">
+    <div class="modal-header">
+      <span class="modal-title">Quick Jump</span>
+      <button class="close-btn" onclick="closeCommandPalette()">×</button>
+    </div>
+    <div class="modal-body">
+      <input id="command-input" class="command-input" placeholder="Search jobs, leads, quotes, contacts, materials, or page names...">
+      <div id="command-results" class="command-results"></div>
+    </div>
   </div>
 </div>
 </body>
