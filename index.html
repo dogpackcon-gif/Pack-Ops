@@ -5117,7 +5117,7 @@ function __runApp() {
     // === STEP 2: Background cloud sync — runs after UI is visible ===
     setTimeout(async () => {
       try {
-        await syncFromCloud({ force: !loadedFromLocal, silent: false, notice: loadedFromLocal ? '✓ Up to date' : null });
+        await syncFromCloud({ force: true, silent: false, notice: loadedFromLocal ? '✓ Up to date' : null });
       } catch(err) {
         console.warn('Background sync failed:', err.message);
         setSyncStatus('offline');
@@ -5139,15 +5139,15 @@ function __runApp() {
     }, 30000);
 
     window.addEventListener('focus', () => {
-      syncFromCloud({ silent: true, notice: '✓ Up to date' });
+      syncFromCloud({ force: true, silent: true, notice: '✓ Up to date' });
     });
 
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) syncFromCloud({ silent: true, notice: '✓ Up to date' });
+      if (!document.hidden) syncFromCloud({ force: true, silent: true, notice: '✓ Up to date' });
     });
 
     window.addEventListener('online', () => {
-      syncFromCloud({ silent: false, notice: '✓ Back online' });
+      syncFromCloud({ force: true, silent: false, notice: '✓ Back online' });
     });
   })();
 }
