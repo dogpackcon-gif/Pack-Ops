@@ -1674,24 +1674,68 @@ function renderLeads(filter='', statusFilter='') {
   let data = state.leads;
   if (filter) data = data.filter(l => JSON.stringify(l).toLowerCase().includes(filter.toLowerCase()));
   if (statusFilter) data = data.filter(l => l.status === statusFilter);
-  tbody.innerHTML = data.length ? data.map((l,i) => `
-    <tr>
-      <td class="font-mono">${l.id}</td>
-      <td>${l.date}</td>
-      <td><strong>${l.contact}</strong></td>
-      <td>${l.phone||'—'}</td>
-      <td>${l.source}</td>
-      <td>${l.desc||'—'}</td>
-      <td><span class="badge badge-gray">${l.jobtype}</span></td>
-      <td>${l.value ? fmt(l.value) : '—'}</td>
-      <td>${statusBadge(l.status)}</td>
-      <td>${l.nextstep||'—'}</td>
-      <td>
-        <button class="btn btn-primary btn-sm" onclick="createQuoteFromLead(${state.leads.indexOf(l)})">+ Quote</button>
-        <button class="btn btn-ghost btn-sm" onclick="editLead(${state.leads.indexOf(l)})">Edit</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteLead(${state.leads.indexOf(l)})">✕</button>
-      </td>
-    </tr>`).join('') : `<tr><td colspan="11" class="no-data">No leads found</td></tr>`;
+  const isMobile = window.innerWidth <= 768;
+
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="11" class="no-data">No leads found</td></tr>`;
+    return;
+  }
+
+  if (isMobile) {
+    // Card layout on mobile — wrap in a single td spanning all columns
+    tbody.innerHTML = data.map((l,i) => {
+      const idx = state.leads.indexOf(l);
+      return `<tr><td colspan="11" style="padding:0;border:none;">
+        <div class="job-card">
+          <div class="job-card-top">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:var(--accent);">${l.id}</span>
+                ${statusBadge(l.status)}
+                ${l.jobtype ? `<span style="font-size:11px;color:var(--text3);">${l.jobtype}</span>` : ''}
+              </div>
+              <div style="font-weight:600;font-size:15px;margin-top:2px;">${l.contact}</div>
+            </div>
+            <div style="text-align:right;">
+              ${l.value ? `<div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:var(--yellow);">${fmt(l.value)}</div>` : ''}
+              <div style="font-size:11px;color:var(--text3);">${l.date}</div>
+            </div>
+          </div>
+          ${l.desc ? `<div class="job-card-desc">${l.desc}</div>` : ''}
+          ${l.phone ? `<div style="font-size:12px;color:var(--text3);margin-bottom:4px;">📞 ${l.phone}</div>` : ''}
+          ${l.nextstep ? `<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">➡ ${l.nextstep}</div>` : ''}
+          <div class="job-card-bottom">
+            <div style="font-size:12px;color:var(--text3);">${l.source||'—'}</div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-primary btn-sm" onclick="createQuoteFromLead(${idx})">+ Quote</button>
+              <button class="btn btn-ghost btn-sm" onclick="editLead(${idx})">Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteLead(${idx})">✕</button>
+            </div>
+          </div>
+        </div>
+      </td></tr>`;
+    }).join('');
+  } else {
+    tbody.innerHTML = data.map((l) => {
+      const idx = state.leads.indexOf(l);
+      return `<tr>
+        <td class="font-mono">${l.id}</td>
+        <td>${l.date}</td>
+        <td><strong>${l.contact}</strong></td>
+        <td>${l.phone||'—'}</td>
+        <td>${l.source}</td>
+        <td>${l.desc||'—'}</td>
+        <td>${statusBadge(l.status)}</td>
+        <td>${l.value ? fmt(l.value) : '—'}</td>
+        <td>${l.nextstep||'—'}</td>
+        <td>
+          <button class="btn btn-primary btn-sm" onclick="createQuoteFromLead(${idx})">+ Quote</button>
+          <button class="btn btn-ghost btn-sm" onclick="editLead(${idx})">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteLead(${idx})">✕</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
 }
 function filterLeadStatus(v) { renderLeads('', v); }
 function editLead(i) {
@@ -1893,20 +1937,61 @@ function saveQuoteFromBuilder() {
 
 function renderQuotes(filter='') {
   const tbody = $('quotes-body');
-  let data = state.quotes;
+  let data = state.quotes.filter(q => q.id);
   if (filter) data = data.filter(q => JSON.stringify(q).toLowerCase().includes(filter.toLowerCase()));
-  tbody.innerHTML = data.filter(q=>q.id).map(q => `
-    <tr>
-      <td class="font-mono">${q.id}</td><td>${q.leadId||'—'}</td><td class="font-mono">${q.jobCode||'—'}</td>
-      <td>${q.date||'—'}</td><td><strong>${q.client||'—'}</strong></td><td>${q.desc||'—'}</td>
-      <td>${q.hrs||0}h</td><td>${fmt(q.labour)}</td><td>${fmt(q.material)}</td>
-      <td><strong class="text-accent">${fmt(q.total)}</strong></td>
-      <td>${statusBadge(q.status)}</td>
-      <td>
-        <button class="btn btn-primary btn-sm" onclick="editQuoteInBuilder(${state.quotes.indexOf(q)})">Edit</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteQuote(${state.quotes.indexOf(q)})">✕</button>
-      </td>
-    </tr>`).join('') || `<tr><td colspan="12" class="no-data">No quotes</td></tr>`;
+  const isMobile = window.innerWidth <= 768;
+
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="12" class="no-data">No quotes</td></tr>`;
+    return;
+  }
+
+  if (isMobile) {
+    tbody.innerHTML = data.map(q => {
+      const idx = state.quotes.indexOf(q);
+      return `<tr><td colspan="12" style="padding:0;border:none;">
+        <div class="job-card">
+          <div class="job-card-top">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:var(--accent);">${q.id}</span>
+                ${statusBadge(q.status)}
+              </div>
+              <div style="font-weight:600;font-size:15px;margin-top:2px;">${q.client||'—'}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:var(--green);">${fmt(q.total)}</div>
+              <div style="font-size:11px;color:var(--text3);">${q.date||''}</div>
+            </div>
+          </div>
+          ${q.desc ? `<div class="job-card-desc">${q.desc}</div>` : ''}
+          <div style="font-size:12px;color:var(--text3);margin-bottom:6px;">${q.hrs||0}h labour · ${fmt(q.material)} materials</div>
+          <div class="job-card-bottom">
+            <div style="font-size:12px;color:var(--text3);">${q.jobtype||'—'}${q.jobCode ? ' · Job '+q.jobCode : ''}</div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-primary btn-sm" onclick="editQuoteInBuilder(${idx})">Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteQuote(${idx})">✕</button>
+            </div>
+          </div>
+        </div>
+      </td></tr>`;
+    }).join('');
+  } else {
+    tbody.innerHTML = data.map(q => {
+      const idx = state.quotes.indexOf(q);
+      return `<tr>
+        <td class="font-mono">${q.id}</td><td>${q.leadId||'—'}</td><td class="font-mono">${q.jobCode||'—'}</td>
+        <td>${q.date||'—'}</td><td><strong>${q.client||'—'}</strong></td><td>${q.desc||'—'}</td>
+        <td>${q.hrs||0}h</td><td>${fmt(q.labour)}</td><td>${fmt(q.material)}</td>
+        <td><strong class="text-accent">${fmt(q.total)}</strong></td>
+        <td>${statusBadge(q.status)}</td>
+        <td>
+          <button class="btn btn-primary btn-sm" onclick="editQuoteInBuilder(${idx})">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteQuote(${idx})">✕</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
 }
 function editQuote(i) {
   const q = state.quotes[i]; state.editIdx.quotes = i;
