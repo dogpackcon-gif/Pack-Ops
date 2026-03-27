@@ -5028,85 +5028,90 @@ function watchState() { /* state is saved explicitly via saveData() */ }
 
 // ===================== INIT =====================
 function __runApp() {
-(async () => {
-  // Show loading overlay — blocks rendering until real data arrives
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:#0f1117;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;';
-  overlay.innerHTML = '<div style="font-size:36px;margin-bottom:12px;">⚡</div><div style="font-family:Barlow Condensed,sans-serif;font-size:24px;font-weight:700;color:#f4a623;letter-spacing:1px;">PACK ELECTRICAL</div><div style="font-size:13px;color:#64748b;margin-top:8px;">Loading...</div>';
-  document.body.appendChild(overlay);
+  (async () => {
+    // Show overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:#0f1117;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;';
+    overlay.innerHTML = '<div style="font-size:36px;margin-bottom:12px;">⚡</div><div style="font-family:Barlow Condensed,sans-serif;font-size:24px;font-weight:700;color:#f4a623;letter-spacing:1px;">PACK ELECTRICAL</div><div style="font-size:13px;color:#64748b;margin-top:8px;">Loading your data...</div>';
+    document.body.appendChild(overlay);
 
-  if (!state.timeEntries) state.timeEntries = [];
-  if (!state.contacts)    state.contacts    = [];
+    if (!state.timeEntries) state.timeEntries = [];
+    if (!state.contacts)    state.contacts    = [];
 
-  // Pull from Supabase — source of truth
-  let loaded = false;
-  try {
-    const row = await supabaseLoad();
-    if (row && row.data) {
-      applySnapshot(row.data);
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(row.data)); } catch(e) {}
-      _lastSyncAt = row.updated_at;
-      loaded = true;
-    }
-  } catch(err) {
-    console.warn('Supabase load failed:', err.message);
-  }
-
-  // Fallback to localStorage if offline
-  if (!loaded) {
+    // === STEP 1: Load localStorage instantly so UI appears right away ===
+    let loadedFromLocal = false;
     try {
       const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('packops_data');
-      if (raw) { applySnapshot(JSON.parse(raw)); loaded = true; }
-    } catch(e) {}
-  }
-
-  // Remove overlay and render with real data
-  overlay.remove();
-  populateClientDatalist();
-  renderDashboard();
-  updateNextJobDisplay();
-  $('qb-assembly-select') && $('qb-assembly-select').addEventListener('change', updateAssemblyPreview);
-  $('e-date').value = new Date().toISOString().split('T')[0];
-  $('tl-date') && ($('tl-date').value = new Date().toISOString().split('T')[0]);
-
-  // Show sync status
-  const si = $('save-indicator');
-  if (si && loaded) {
-    si.style.display='inline'; si.textContent=_lastSyncAt?'✓ Up to date':'💾 Offline'; si.style.color=_lastSyncAt?'var(--green)':'var(--text3)';
-    setTimeout(()=>{ si.style.display='none'; }, 2000);
-  }
-
-  // Show sync time in sidebar
-  try {
-    if (_lastSyncAt) {
-      const footer = $('sidebar-footer');
-      if (footer) {
-        const ex = footer.querySelector('.sync-time'); if (ex) ex.remove();
-        const el = document.createElement('div');
-        el.className='sync-time'; el.style.cssText='margin-top:4px;font-size:10px;color:var(--text3);';
-        el.textContent='Synced: '+new Date(_lastSyncAt).toLocaleString('en-CA',{dateStyle:'short',timeStyle:'short'});
-        footer.appendChild(el);
+      if (raw) {
+        applySnapshot(JSON.parse(raw));
+        loadedFromLocal = true;
       }
+    } catch(e) {}
+
+    // Remove overlay and render immediately with whatever we have
+    overlay.remove();
+    populateClientDatalist();
+    renderDashboard();
+    updateNextJobDisplay();
+    $('qb-assembly-select') && $('qb-assembly-select').addEventListener('change', updateAssemblyPreview);
+    $('e-date') && ($('e-date').value = new Date().toISOString().split('T')[0]);
+    $('tl-date') && ($('tl-date').value = new Date().toISOString().split('T')[0]);
+
+    // === STEP 2: Background cloud sync — runs after UI is visible ===
+    setTimeout(async () => {
+      try {
+        const row = await supabaseLoad();
+        if (row && row.data) {
+          const cloudTime = new Date(row.updated_at || 0);
+          const localTime = new Date(localStorage.getItem('packops_last_sync') || 0);
+          // Apply cloud data if it's newer than what we loaded locally
+          if (!loadedFromLocal || cloudTime > localTime) {
+            applySnapshot(row.data);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(row.data));
+            localStorage.setItem('packops_last_sync', row.updated_at);
+            _lastSyncAt = row.updated_at;
+            // Re-render with fresh cloud data
+            populateClientDatalist();
+            renderDashboard();
+            updateNextJobDisplay();
+            const ap = document.querySelector('.page.active');
+            if (ap) { const id = ap.id.replace('page-',''); if (id !== 'dashboard') renderPage(id); }
+            const si = $('save-indicator');
+            if (si) { si.style.display='inline'; si.textContent='✓ Up to date'; si.style.color='var(--green)'; setTimeout(()=>si.style.display='none', 2000); }
+          }
+          setSyncStatus('saved');
+        }
+      } catch(err) {
+        console.warn('Background sync failed:', err.message);
+        setSyncStatus('offline');
+      }
+    }, 300);
+
+    // Show local load status
+    const si = $('save-indicator');
+    if (si && loadedFromLocal) {
+      si.style.display='inline'; si.textContent='💾 Loaded'; si.style.color='var(--text3)';
+      setTimeout(()=>{ si.style.display='none'; }, 1500);
     }
-  } catch(e) {}
 
-  // Auto-refresh every 30 seconds
-  setInterval(async () => {
-    try {
-      const row = await supabaseLoad();
-      if (row && row.data && row.updated_at !== _lastSyncAt) {
-        applySnapshot(row.data);
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(row.data)); } catch(e) {}
-        _lastSyncAt = row.updated_at;
-        populateClientDatalist(); renderDashboard(); updateNextJobDisplay();
-        const ap = document.querySelector('.page.active');
-        if (ap) { const id=ap.id.replace('page-',''); if(id!=='dashboard') renderPage(id); }
-        const si2=$('save-indicator');
-        if(si2){si2.style.display='inline';si2.textContent='🔄 Updated';si2.style.color='var(--blue)';setTimeout(()=>{si2.style.display='none';},2500);}
-      }
-    } catch(e) {}
-  }, 30000);
-})();
+    // === STEP 3: Auto-refresh every 30s ===
+    setInterval(async () => {
+      try {
+        const row = await supabaseLoad();
+        if (row && row.data && row.updated_at !== _lastSyncAt) {
+          applySnapshot(row.data);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(row.data));
+          localStorage.setItem('packops_last_sync', row.updated_at);
+          _lastSyncAt = row.updated_at;
+          populateClientDatalist(); renderDashboard(); updateNextJobDisplay();
+          const ap = document.querySelector('.page.active');
+          if (ap) { const id=ap.id.replace('page-',''); if(id!=='dashboard') renderPage(id); }
+          const si2=$('save-indicator');
+          if(si2){si2.style.display='inline';si2.textContent='🔄 Updated';si2.style.color='var(--blue)';setTimeout(()=>{si2.style.display='none';},2500);}
+        }
+      } catch(e) {}
+    }, 30000);
+  })();
 }
 // Run after DOM is fully ready
 if (document.readyState === 'loading') {
@@ -5115,32 +5120,6 @@ if (document.readyState === 'loading') {
   __runApp().catch(e => console.error('__runApp failed:', e));
 }
 
-// Belt-and-suspenders: also run on window load if state is still empty
-window.addEventListener('load', () => {
-  setTimeout(async () => {
-    if (!state.jobs || state.jobs.length === 0) {
-      try {
-        const row = await supabaseLoad();
-        if (row && row.data) {
-          applySnapshot(row.data);
-          _lastSyncAt = row.updated_at;
-          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(row.data)); } catch(e) {}
-        } else {
-          const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('packops_data');
-          if (raw) applySnapshot(JSON.parse(raw));
-        }
-      } catch(e) {
-        const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('packops_data');
-        if (raw) try { applySnapshot(JSON.parse(raw)); } catch(e2) {}
-      }
-      populateClientDatalist();
-      renderDashboard();
-      updateNextJobDisplay();
-      const si = $('save-indicator');
-      if (si) { si.style.display='inline'; si.textContent=_lastSyncAt?'✓ Up to date':'💾 Offline'; si.style.color=_lastSyncAt?'var(--green)':'var(--text3)'; setTimeout(()=>si.style.display='none', 2000); }
-    }
-  }, 200);
-});
 </script>
 
 <!-- Client datalist for all forms -->
