@@ -5112,8 +5112,41 @@ function __runApp() {
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', __runApp);
 } else {
-  __runApp();
+  __runApp().catch(e => console.error('__runApp failed:', e));
 }
+
+// Belt-and-suspenders: also run on window load if state is still empty
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    const s = document.createElement('script');
+    s.textContent = `
+      if (!state.jobs || state.jobs.length === 0) {
+        (async () => {
+          const row = await supabaseLoad();
+          if (row && row.data) {
+            applySnapshot(row.data);
+            _lastSyncAt = row.updated_at;
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(row.data)); } catch(e) {}
+            populateClientDatalist();
+            renderDashboard();
+            updateNextJobDisplay();
+            const si = document.getElementById('save-indicator');
+            if (si) { si.style.display='inline'; si.textContent='✓ Up to date'; si.style.color='var(--green)'; setTimeout(()=>si.style.display='none', 2000); }
+          } else {
+            const raw = localStorage.getItem('packops_v1');
+            if (raw && state.jobs.length === 0) {
+              applySnapshot(JSON.parse(raw));
+              populateClientDatalist();
+              renderDashboard();
+              updateNextJobDisplay();
+            }
+          }
+        })();
+      }
+    `;
+    document.head.appendChild(s);
+  }, 100);
+});
 </script>
 
 <!-- Client datalist for all forms -->
