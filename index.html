@@ -1626,6 +1626,7 @@ const STORAGE_KEY  = 'packops_v1';
 let _syncTimeout   = null;
 let _lastSyncAt    = null;
 let _syncStatus    = 'idle'; // idle | saving | saved | error
+let _pullInFlight  = null;
 
 
 // ---- DATA LOADED FROM SUPABASE ON INIT ---- 
@@ -3775,7 +3776,7 @@ function setSyncStatus(status, msg) {
   else if (status === 'offline') { el.textContent = '💾 Saved locally'; el.style.color = 'var(--text3)'; setTimeout(()=>{el.style.display='none';}, 2000); }
 }
 
-async function supabaseSave(snapshot) {
+async function supabaseSave(snapshot, updatedAt = new Date().toISOString()) {
   const res = await fetch(SUPABASE_URL + '/rest/v1/app_state', {
     method: 'POST',
     headers: {
@@ -3784,7 +3785,7 @@ async function supabaseSave(snapshot) {
       'Authorization': 'Bearer ' + SUPABASE_KEY,
       'Prefer':        'resolution=merge-duplicates'
     },
-    body: JSON.stringify({ id: 'packops', data: snapshot, updated_at: new Date().toISOString() })
+    body: JSON.stringify({ id: 'packops', data: snapshot, updated_at: updatedAt })
   });
   if (!res.ok) {
     const err = await res.text().catch(()=>'');
@@ -3839,9 +3840,63 @@ function applySnapshot(saved) {
   if (saved.contacts)    state.contacts    = saved.contacts;
 }
 
+function getNewestLocalTimestamp() {
+  let latest = 0;
+  try {
+    latest = Math.max(latest, new Date(localStorage.getItem('packops_last_sync') || 0).getTime() || 0);
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('packops_data');
+    if (raw) {
+      const saved = JSON.parse(raw);
+      latest = Math.max(latest, new Date(saved?.savedAt || 0).getTime() || 0);
+    }
+  } catch(e) {}
+  return latest;
+}
+
+function rerenderApp() {
+  populateClientDatalist();
+  renderDashboard();
+  updateNextJobDisplay();
+  const activePage = document.querySelector('.page.active');
+  if (activePage) {
+    const id = activePage.id.replace('page-','');
+    if (id !== 'dashboard') renderPage(id);
+  }
+}
+
+function showTransientSyncMessage(text, color, duration = 2500) {
+  const el = $('save-indicator');
+  if (!el) return;
+  el.style.display = 'inline';
+  el.textContent = text;
+  el.style.color = color;
+  setTimeout(() => { el.style.display = 'none'; }, duration);
+}
+
+function applyCloudRow(row, { force = false, notice = null } = {}) {
+  if (!row || !row.data) return false;
+  const cloudTime = new Date(row.updated_at || 0).getTime() || 0;
+  const newestLocalTime = getNewestLocalTimestamp();
+  if (!force && cloudTime && newestLocalTime && cloudTime <= newestLocalTime) {
+    _lastSyncAt = row.updated_at || _lastSyncAt;
+    return false;
+  }
+  applySnapshot(row.data);
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(row.data));
+    if (row.updated_at) localStorage.setItem('packops_last_sync', row.updated_at);
+  } catch(e) {}
+  _lastSyncAt = row.updated_at || _lastSyncAt;
+  rerenderApp();
+  if (notice) showTransientSyncMessage(notice, 'var(--green)');
+  return true;
+}
+
 // Debounced save — waits 800ms after last change, then syncs
 function saveData() {
+  const syncedAt = new Date().toISOString();
   const snapshot = getStateSnapshot();
+  snapshot.savedAt = syncedAt;
   // Always save to localStorage immediately as offline backup
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot)); } catch(e) {}
   // Debounce the cloud sync
@@ -3849,8 +3904,9 @@ function saveData() {
   _syncTimeout = setTimeout(async () => {
     setSyncStatus('saving');
     try {
-      await supabaseSave(snapshot);
-      _lastSyncAt = new Date();
+      await supabaseSave(snapshot, syncedAt);
+      _lastSyncAt = syncedAt;
+      try { localStorage.setItem('packops_last_sync', syncedAt); } catch(e) {}
       setSyncStatus('saved');
     } catch(err) {
       console.warn('Supabase sync failed:', err.message);
@@ -3892,33 +3948,34 @@ async function loadData() {
 
 // Pull latest from Supabase — called by the 🔄 Sync button
 async function syncNow() {
-  setSyncStatus('saving');
-  try {
-    const row = await supabaseLoad();
-    if (row && row.data) {
-      applySnapshot(row.data);
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(row.data)); } catch(e) {}
-      _lastSyncAt = row.updated_at;
-      setSyncStatus('saved');
-      // Re-render everything
-      populateClientDatalist();
-      renderDashboard();
-      updateNextJobDisplay();
-      const activePage = document.querySelector('.page.active');
-      if (activePage) {
-        const id = activePage.id.replace('page-','');
-        if (id !== 'dashboard') renderPage(id);
+  return syncFromCloud({ force: true, notice: '✓ Synced!' });
+}
+
+async function syncFromCloud({ force = false, silent = false, notice = null } = {}) {
+  if (_pullInFlight) return _pullInFlight;
+  _pullInFlight = (async () => {
+    if (!silent) setSyncStatus('saving');
+    try {
+      const row = await supabaseLoad();
+      if (!row || !row.data) {
+        if (!silent) setSyncStatus('error', 'No data in cloud yet');
+        return false;
       }
-      // Flash confirmation
-      const si = $('save-indicator');
-      if (si) { si.style.display='inline'; si.textContent='✓ Synced!'; si.style.color='var(--green)'; }
-    } else {
-      setSyncStatus('error', 'No data in cloud yet');
+      const applied = applyCloudRow(row, { force, notice });
+      if (!silent) setSyncStatus('saved');
+      return applied;
+    } catch(err) {
+      if (silent) console.warn('Cloud sync failed:', err.message);
+      else {
+        console.error('syncFromCloud error:', err);
+        setSyncStatus('error', err.message.slice(0,40));
+      }
+      return false;
+    } finally {
+      _pullInFlight = null;
     }
-  } catch(err) {
-    console.error('syncNow error:', err);
-    setSyncStatus('error', err.message.slice(0,40));
-  }
+  })();
+  return _pullInFlight;
 }
 
 // ===================== DASHBOARD (REBUILT) =====================
@@ -5060,27 +5117,7 @@ function __runApp() {
     // === STEP 2: Background cloud sync — runs after UI is visible ===
     setTimeout(async () => {
       try {
-        const row = await supabaseLoad();
-        if (row && row.data) {
-          const cloudTime = new Date(row.updated_at || 0);
-          const localTime = new Date(localStorage.getItem('packops_last_sync') || 0);
-          // Apply cloud data if it's newer than what we loaded locally
-          if (!loadedFromLocal || cloudTime > localTime) {
-            applySnapshot(row.data);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(row.data));
-            localStorage.setItem('packops_last_sync', row.updated_at);
-            _lastSyncAt = row.updated_at;
-            // Re-render with fresh cloud data
-            populateClientDatalist();
-            renderDashboard();
-            updateNextJobDisplay();
-            const ap = document.querySelector('.page.active');
-            if (ap) { const id = ap.id.replace('page-',''); if (id !== 'dashboard') renderPage(id); }
-            const si = $('save-indicator');
-            if (si) { si.style.display='inline'; si.textContent='✓ Up to date'; si.style.color='var(--green)'; setTimeout(()=>si.style.display='none', 2000); }
-          }
-          setSyncStatus('saved');
-        }
+        await syncFromCloud({ force: !loadedFromLocal, silent: false, notice: loadedFromLocal ? '✓ Up to date' : null });
       } catch(err) {
         console.warn('Background sync failed:', err.message);
         setSyncStatus('offline');
@@ -5097,20 +5134,21 @@ function __runApp() {
     // === STEP 3: Auto-refresh every 30s ===
     setInterval(async () => {
       try {
-        const row = await supabaseLoad();
-        if (row && row.data && row.updated_at !== _lastSyncAt) {
-          applySnapshot(row.data);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(row.data));
-          localStorage.setItem('packops_last_sync', row.updated_at);
-          _lastSyncAt = row.updated_at;
-          populateClientDatalist(); renderDashboard(); updateNextJobDisplay();
-          const ap = document.querySelector('.page.active');
-          if (ap) { const id=ap.id.replace('page-',''); if(id!=='dashboard') renderPage(id); }
-          const si2=$('save-indicator');
-          if(si2){si2.style.display='inline';si2.textContent='🔄 Updated';si2.style.color='var(--blue)';setTimeout(()=>{si2.style.display='none';},2500);}
-        }
+        await syncFromCloud({ silent: true, notice: '🔄 Updated' });
       } catch(e) {}
     }, 30000);
+
+    window.addEventListener('focus', () => {
+      syncFromCloud({ silent: true, notice: '✓ Up to date' });
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) syncFromCloud({ silent: true, notice: '✓ Up to date' });
+    });
+
+    window.addEventListener('online', () => {
+      syncFromCloud({ silent: false, notice: '✓ Back online' });
+    });
   })();
 }
 // Run after DOM is fully ready
