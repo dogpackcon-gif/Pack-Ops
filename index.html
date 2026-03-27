@@ -4843,6 +4843,9 @@ self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r
 }
 
 
+// watchState — no-op proxy, kept for compatibility
+function watchState() { /* state is saved explicitly via saveData() */ }
+
 // ===================== INIT =====================
 // Wait for DOM to be fully ready before loading
 window.addEventListener('DOMContentLoaded', () => {}, false);
