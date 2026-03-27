@@ -320,6 +320,29 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 .empty-state .es-icon { font-size:36px; margin-bottom:12px; }
 .empty-state .es-title { font-size:15px; font-weight:600; color:var(--text2); margin-bottom:6px; }
 .empty-state .es-sub { font-size:13px; margin-bottom:16px; }
+
+/* ===== UNIFORM CARDS — Jobs, Leads, Quotes ===== */
+.item-card {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.12s;
+  position: relative;
+}
+.item-card:last-child { border-bottom: none; }
+.item-card:hover { background: var(--surface2); }
+.item-card:active { background: var(--surface); }
+.item-card-row1 { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; }
+.item-card-row2 { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+.item-card-title { font-weight: 700; font-size: 15px; }
+.item-card-sub   { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.item-card-code  { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 600; color: var(--accent); margin-right: 6px; }
+.item-card-amount { font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 700; line-height: 1; }
+.item-card-chevron { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 18px; color: var(--text3); }
+.item-card-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+/* Hide old table on all screen sizes for these pages */
+#leads-table thead, #quotes-table thead, #jobs-table thead { display: none; }
+
 </style>
 </head>
 <body>
@@ -1674,69 +1697,46 @@ function renderLeads(filter='', statusFilter='') {
   let data = state.leads;
   if (filter) data = data.filter(l => JSON.stringify(l).toLowerCase().includes(filter.toLowerCase()));
   if (statusFilter) data = data.filter(l => l.status === statusFilter);
-  const isMobile = window.innerWidth <= 768;
 
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="11" class="no-data">No leads found</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="es-icon">📋</div><div class="es-title">No leads found</div><button class="btn btn-primary btn-sm" onclick="openModal('modal-lead')">+ New Lead</button></div></td></tr>`;
     return;
   }
 
-  if (isMobile) {
-    // Card layout on mobile — wrap in a single td spanning all columns
-    tbody.innerHTML = data.map((l,i) => {
-      const idx = state.leads.indexOf(l);
-      return `<tr><td colspan="11" style="padding:0;border:none;">
-        <div class="job-card">
-          <div class="job-card-top">
-            <div>
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:var(--accent);">${l.id}</span>
-                ${statusBadge(l.status)}
-                ${l.jobtype ? `<span style="font-size:11px;color:var(--text3);">${l.jobtype}</span>` : ''}
-              </div>
-              <div style="font-weight:600;font-size:15px;margin-top:2px;">${l.contact}</div>
+  tbody.innerHTML = data.map(l => {
+    const idx = state.leads.indexOf(l);
+    return `<tr><td colspan="11" style="padding:0;border:none;">
+      <div class="item-card" onclick="editLead(${idx})">
+        <div class="item-card-row1">
+          <div style="flex:1;min-width:0;padding-right:32px;">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
+              <span class="item-card-code">${l.id}</span>
+              ${statusBadge(l.status)}
+              ${l.jobtype ? `<span style="font-size:11px;color:var(--text3);">${l.jobtype}</span>` : ''}
             </div>
-            <div style="text-align:right;">
-              ${l.value ? `<div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:var(--yellow);">${fmt(l.value)}</div>` : ''}
-              <div style="font-size:11px;color:var(--text3);">${l.date}</div>
-            </div>
+            <div class="item-card-title">${l.contact}</div>
+            <div class="item-card-sub">${l.desc || l.jobtype || 'No description'}${l.phone ? ' · 📞 '+l.phone : ''}</div>
           </div>
-          ${l.desc ? `<div class="job-card-desc">${l.desc}</div>` : ''}
-          ${l.phone ? `<div style="font-size:12px;color:var(--text3);margin-bottom:4px;">📞 ${l.phone}</div>` : ''}
-          ${l.nextstep ? `<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">➡ ${l.nextstep}</div>` : ''}
-          <div class="job-card-bottom">
-            <div style="font-size:12px;color:var(--text3);">${l.source||'—'}</div>
-            <div style="display:flex;gap:6px;">
-              <button class="btn btn-primary btn-sm" onclick="createQuoteFromLead(${idx})">+ Quote</button>
-              <button class="btn btn-ghost btn-sm" onclick="editLead(${idx})">Edit</button>
-              <button class="btn btn-danger btn-sm" onclick="deleteLead(${idx})">✕</button>
-            </div>
+          <div style="text-align:right;flex-shrink:0;">
+            ${l.value ? `<div class="item-card-amount" style="color:var(--yellow);">${fmt(l.value)}</div>` : ''}
+            <div style="font-size:11px;color:var(--text3);">${l.date}</div>
           </div>
         </div>
-      </td></tr>`;
-    }).join('');
-  } else {
-    tbody.innerHTML = data.map((l) => {
-      const idx = state.leads.indexOf(l);
-      return `<tr>
-        <td class="font-mono">${l.id}</td>
-        <td>${l.date}</td>
-        <td><strong>${l.contact}</strong></td>
-        <td>${l.phone||'—'}</td>
-        <td>${l.source}</td>
-        <td>${l.desc||'—'}</td>
-        <td>${statusBadge(l.status)}</td>
-        <td>${l.value ? fmt(l.value) : '—'}</td>
-        <td>${l.nextstep||'—'}</td>
-        <td>
-          <button class="btn btn-primary btn-sm" onclick="createQuoteFromLead(${idx})">+ Quote</button>
-          <button class="btn btn-ghost btn-sm" onclick="editLead(${idx})">Edit</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteLead(${idx})">✕</button>
-        </td>
-      </tr>`;
-    }).join('');
-  }
+        ${l.nextstep ? `<div style="font-size:12px;color:var(--text2);margin:4px 0;">➡ ${l.nextstep}</div>` : ''}
+        <div class="item-card-row2">
+          <div style="font-size:12px;color:var(--text3);">${l.source||'—'}</div>
+          <div class="item-card-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-primary btn-sm" onclick="createQuoteFromLead(${idx})">+ Quote</button>
+            <button class="btn btn-ghost btn-sm" onclick="editLead(${idx})">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteLead(${idx})">✕</button>
+          </div>
+        </div>
+        <span class="item-card-chevron">›</span>
+      </div>
+    </td></tr>`;
+  }).join('');
 }
+
 function filterLeadStatus(v) { renderLeads('', v); }
 function editLead(i) {
   const l = state.leads[i];
@@ -1939,14 +1939,45 @@ function renderQuotes(filter='') {
   const tbody = $('quotes-body');
   let data = state.quotes.filter(q => q.id);
   if (filter) data = data.filter(q => JSON.stringify(q).toLowerCase().includes(filter.toLowerCase()));
-  const isMobile = window.innerWidth <= 768;
 
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="12" class="no-data">No quotes</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12"><div class="empty-state"><div class="es-icon">💰</div><div class="es-title">No quotes yet</div><button class="btn btn-primary btn-sm" onclick="openNewQuote()">+ New Quote</button></div></td></tr>`;
     return;
   }
 
-  if (isMobile) {
+  tbody.innerHTML = data.map(q => {
+    const idx = state.quotes.indexOf(q);
+    return `<tr><td colspan="12" style="padding:0;border:none;">
+      <div class="item-card" onclick="editQuoteInBuilder(${idx})">
+        <div class="item-card-row1">
+          <div style="flex:1;min-width:0;padding-right:32px;">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
+              <span class="item-card-code">${q.id}</span>
+              ${statusBadge(q.status)}
+              ${q.jobtype ? `<span style="font-size:11px;color:var(--text3);">${q.jobtype}</span>` : ''}
+            </div>
+            <div class="item-card-title">${q.client||'No client'}</div>
+            <div class="item-card-sub">${q.desc||'No description'}${q.jobCode ? ' · Job #'+q.jobCode : ''}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div class="item-card-amount text-green">${fmt(q.total)}</div>
+            <div style="font-size:11px;color:var(--text3);">${q.date||''}</div>
+          </div>
+        </div>
+        <div class="item-card-row2">
+          <div style="font-size:12px;color:var(--text3);">
+            ${q.hrs||0}h · Mat ${fmt(q.material)} · Lab ${fmt(q.labour)}
+          </div>
+          <div class="item-card-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-primary btn-sm" onclick="editQuoteInBuilder(${idx})">Open</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteQuote(${idx})">✕</button>
+          </div>
+        </div>
+        <span class="item-card-chevron">›</span>
+      </div>
+    </td></tr>`;
+  }).join('');
+}
     tbody.innerHTML = data.map(q => {
       const idx = state.quotes.indexOf(q);
       return `<tr><td colspan="12" style="padding:0;border:none;">
@@ -1976,23 +2007,7 @@ function renderQuotes(filter='') {
         </div>
       </td></tr>`;
     }).join('');
-  } else {
-    tbody.innerHTML = data.map(q => {
-      const idx = state.quotes.indexOf(q);
-      return `<tr>
-        <td class="font-mono">${q.id}</td><td>${q.leadId||'—'}</td><td class="font-mono">${q.jobCode||'—'}</td>
-        <td>${q.date||'—'}</td><td><strong>${q.client||'—'}</strong></td><td>${q.desc||'—'}</td>
-        <td>${q.hrs||0}h</td><td>${fmt(q.labour)}</td><td>${fmt(q.material)}</td>
-        <td><strong class="text-accent">${fmt(q.total)}</strong></td>
-        <td>${statusBadge(q.status)}</td>
-        <td>
-          <button class="btn btn-primary btn-sm" onclick="editQuoteInBuilder(${idx})">Edit</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteQuote(${idx})">✕</button>
-        </td>
-      </tr>`;
-    }).join('');
-  }
-}
+
 function editQuote(i) {
   const q = state.quotes[i]; state.editIdx.quotes = i;
   $('modal-quote-title').textContent = 'Edit Quote';
@@ -2027,25 +2042,52 @@ function renderJobs(filter='', statusFilter='') {
   let data = state.jobs;
   if (filter) data = data.filter(j => JSON.stringify(j).toLowerCase().includes(filter.toLowerCase()));
   if (statusFilter) data = data.filter(j => j.status === statusFilter);
+
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="es-icon">🔧</div><div class="es-title">No jobs found</div><button class="btn btn-primary btn-sm" onclick="openNewJob()">+ New Job</button></div></td></tr>`;
+    return;
+  }
+
   tbody.innerHTML = data.map(j => {
-    const gp = (j.revenue||0)-(j.lcost||0)-(j.mcost||0);
-    const margin = j.revenue > 0 ? gp/j.revenue : 0;
-    return `<tr>
-      <td class="font-mono"><strong style="cursor:pointer;color:var(--accent);" onclick="viewJobNotes(${state.jobs.indexOf(j)})">${j.code}</strong></td>
-      <td>${j.client}</td><td>${j.desc}</td>
-      <td>${statusBadge(j.status)}</td>
-      <td>${fmt(j.revenue)}</td><td>${fmt(j.lcost)}</td><td>${fmt(j.mcost)}</td>
-      <td class="${gp>0?'text-green':'text-red'}">${fmt(gp)}</td>
-      <td>${j.revenue > 0 ? pct(margin) : '—'}</td>
-      <td>${j.paid==='Yes'?'<span class="badge badge-green">Paid</span>':j.paid==='Partially'?'<span class="badge badge-yellow">Partial</span>':'<span class="badge badge-gray">No</span>'}</td>
-      <td>
-        <button class="btn btn-ghost btn-sm" onclick="editJob(${state.jobs.indexOf(j)})">Edit</button>
-        <button class="btn btn-ghost btn-sm" onclick="viewJobNotes(${state.jobs.indexOf(j)})" title="Notes/Details">📝</button>
-        <button class="btn btn-ghost btn-sm btn-dup" onclick="duplicateJob(${state.jobs.indexOf(j)})" title="Duplicate job">⧉</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteJob(${state.jobs.indexOf(j)})">✕</button>
-      </td>
-    </tr>`;
-  }).join('') || `<tr><td colspan="11" class="no-data">No jobs</td></tr>`;
+    const idx = state.jobs.indexOf(j);
+    const gp  = (j.revenue||0) - (j.lcost||0) - (j.mcost||0);
+    const over = j.quote > 0 && ((j.lcost||0)+(j.mcost||0)) > j.quote * 0.9;
+    const noT  = !j.lhrs && j.status === 'In Progress';
+    const tags = [
+      over ? `<span class="job-alert-tag over">Over Budget</span>` : '',
+      noT  ? `<span class="job-alert-tag warn">No Time</span>`    : '',
+    ].join('');
+    return `<tr><td colspan="11" style="padding:0;border:none;">
+      <div class="item-card" onclick="viewJobNotes(${idx})">
+        <div class="item-card-row1">
+          <div style="flex:1;min-width:0;padding-right:32px;">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
+              <span class="item-card-code">${j.code}</span>
+              ${statusBadge(j.status)}
+              ${tags}
+            </div>
+            <div class="item-card-title">${j.client}</div>
+            <div class="item-card-sub">${j.desc||'No description'}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div class="item-card-amount ${gp>=0?'text-green':'text-red'}">${fmt(gp)}</div>
+            <div style="font-size:11px;color:var(--text3);">GP</div>
+          </div>
+        </div>
+        <div class="item-card-row2">
+          <div style="font-size:12px;color:var(--text3);">
+            ${j.lhrs||0}h · Rev ${fmt(j.revenue)} · ${j.paid==='Yes'?'<span style="color:var(--green);">✓ Paid</span>':'<span style="color:var(--yellow);">Unpaid</span>'}
+          </div>
+          <div class="item-card-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-ghost btn-sm" onclick="editJob(${idx})">Edit</button>
+            <button class="btn btn-ghost btn-sm btn-dup" onclick="duplicateJob(${idx})" title="Duplicate">⧉</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteJob(${idx})">✕</button>
+          </div>
+        </div>
+        <span class="item-card-chevron">›</span>
+      </div>
+    </td></tr>`;
+  }).join('');
 }
 function filterJobStatus(v) { renderJobs('', v); }
 function editJob(i) {
