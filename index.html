@@ -882,6 +882,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
                   </div>
                 </div>
                   <div class="form-group"><label class="form-label">Project Description <button type="button" class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 8px;border-color:var(--accent);color:var(--accent);margin-left:6px;" onclick="aiGenerateQuoteDesc()">✨ AI Write</button></label><input class="form-control" id="qb-project" placeholder="Project description"></div>
+                  <div class="form-group"><label class="form-label">Notes <span style="color:var(--text3);font-weight:400;font-size:11px;">— internal notes, special instructions, site access, etc.</span></label><textarea class="form-control" id="qb-notes" rows="3" placeholder="e.g. Key in lockbox, panel in basement, call before arriving..." style="resize:vertical;font-size:13px;"></textarea></div>
                   <div class="form-group"><label class="form-label">Job Code</label><input class="form-control" id="qb-jobcode" placeholder="e.g. 26041"></div>
                 </div>
                 <div class="form-grid form-grid-3">
@@ -1706,18 +1707,50 @@ function deleteLead(i) { if(confirm('Delete this lead?')) { state.leads.splice(i
 function saveLead() {
   const contact = $('l-contact').value.trim();
   if (!contact) { alert('Contact name required'); return; }
+  const isNew = state.editIdx.leads === null;
   const obj = {
-    id: state.editIdx.leads !== null ? state.leads[state.editIdx.leads].id : 'L'+String(state.leads.length+1).padStart(4,'0'),
+    id: isNew ? 'L'+String(state.leads.length+1).padStart(4,'0') : state.leads[state.editIdx.leads].id,
     date: new Date().toISOString().split('T')[0],
     contact, phone:$('l-phone').value, email:$('l-email').value, source:$('l-source').value,
     desc:$('l-desc').value, jobtype:$('l-jobtype').value, value:parseFloat($('l-value').value)||0,
     status:$('l-status').value, nextstep:$('l-nextstep').value, notes:$('l-notes').value
   };
-  if (state.editIdx.leads !== null) state.leads[state.editIdx.leads] = obj;
+  if (!isNew) state.leads[state.editIdx.leads] = obj;
   else state.leads.push(obj);
   state.editIdx.leads = null;
+
+  // Auto-add to contacts if not already there
+  if (isNew) {
+    const already = state.contacts.find(c =>
+      c.name.toLowerCase() === contact.toLowerCase() ||
+      c.phone === obj.phone && obj.phone
+    );
+    if (!already) {
+      const newContact = {
+        id:      'CT' + String(Date.now()).slice(-6),
+        name:    contact,
+        phone:   obj.phone  || '',
+        email:   obj.email  || '',
+        city:    '',
+        address: '',
+        company: '',
+        notes:   obj.notes  || '',
+        type:    obj.jobtype?.includes('Commercial') ? 'Commercial' : 'Residential',
+      };
+      state.contacts.push(newContact);
+      populateClientDatalist();
+      // Flash a subtle confirmation
+      const fb = document.createElement('div');
+      fb.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--blue);color:#fff;padding:10px 20px;border-radius:8px;font-weight:600;z-index:9999;font-size:13px;';
+      fb.textContent = '👤 ' + contact + ' added to Contacts';
+      document.body.appendChild(fb);
+      setTimeout(() => fb.remove(), 3000);
+    }
+  }
+
   saveData();
-  closeModal('modal-lead'); renderLeads();
+  closeModal('modal-lead');
+  renderLeads();
 }
 
 // ===================== OPEN NEW QUOTE =====================
@@ -1744,6 +1777,7 @@ function editQuoteInBuilder(i) {
   $('qb-markup').value   = q.markup || 30;
   $('qb-status').value   = q.status || 'Draft';
   try { $('qb-jobtype').value = q.jobtype || 'Residential Reno'; } catch(e){}
+  if ($('qb-notes')) $('qb-notes').value = q.notes || '';
 
   // Restore line items if saved
   if (q.lines && q.lines.length) {
@@ -1768,6 +1802,15 @@ function createQuoteFromLead(i) {
   $('qb-status').value   = 'Draft';
   try { $('qb-jobtype').value = l.jobtype || 'Residential Reno'; } catch(e){}
 
+  // Auto-populate notes from lead — nextstep and notes combined
+  const leadNotes = [
+    l.notes     ? '📋 Lead notes: ' + l.notes : '',
+    l.nextstep  ? '➡ Next step: ' + l.nextstep : '',
+    l.phone     ? '📞 Phone: ' + l.phone : '',
+    l.value     ? '💰 Estimated value: $' + l.value.toLocaleString() : '',
+  ].filter(Boolean).join('\n');
+  if ($('qb-notes')) $('qb-notes').value = leadNotes;
+
   // Update lead status
   state.leads[i].status = 'Quoting';
 
@@ -1779,6 +1822,7 @@ function clearQuoteBuilder(linesOnly = false) {
   if (!linesOnly) {
     $('qb-client').value  = '';
     $('qb-project').value = '';
+    $('qb-notes') && ($('qb-notes').value = '');
     $('qb-jobcode').value = String(getNextJobNum());
     $('qb-leadid').value  = '';
     $('qb-date').value    = new Date().toISOString().split('T')[0];
@@ -1821,7 +1865,7 @@ function saveQuoteFromBuilder() {
     markup,
     total:    parseFloat(total.toFixed(2)),
     status:   $('qb-status').value,
-    notes:    '',
+    notes:    $('qb-notes')?.value || '',
     lines:    JSON.parse(JSON.stringify(state.qbLines)) // save line items
   };
 
@@ -4703,6 +4747,18 @@ async function exportQuotePDF() {
     const maxLines = Math.min(lines.length, 20);
     doc.text(lines.slice(0,maxLines), 14, y);
     y += maxLines * 4.5 + 6;
+  }
+
+  // Quote notes if present
+  const qNotes = $('qb-notes')?.value?.trim() || '';
+  if (qNotes) {
+    doc.setFillColor(255,250,230); doc.roundedRect(12, y, 186, 7, 1, 1, 'F');
+    doc.setFontSize(9); doc.setTextColor(...dark); doc.setFont('helvetica','bold');
+    doc.text('NOTES', 14, y+5); y += 11;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(60,60,60);
+    const noteLines = doc.splitTextToSize(qNotes, 182);
+    doc.text(noteLines.slice(0, 8), 14, y);
+    y += Math.min(noteLines.length, 8) * 4.5 + 6;
   }
 
   // Line items
