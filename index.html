@@ -712,6 +712,65 @@ textarea.form-control { resize: vertical; min-height: 80px; }
             </div>
           </div>
 
+          <!-- Logo Settings -->
+          <div class="table-card" style="margin-bottom:20px;">
+            <div class="table-header"><span class="table-title">🖼 Company Logo</span></div>
+            <div style="padding:20px;">
+              <div style="display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;">
+                <div id="logo-preview-wrap" style="width:120px;height:80px;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--surface2);">
+                  <img id="logo-preview-img" style="max-width:110px;max-height:70px;display:none;border-radius:4px;">
+                  <span id="logo-preview-placeholder" style="font-size:11px;color:var(--text3);text-align:center;padding:8px;">No logo<br>uploaded</span>
+                </div>
+                <div style="flex:1;min-width:200px;">
+                  <div class="form-label" style="margin-bottom:8px;">Upload your logo — appears on PDF quotes and invoices</div>
+                  <input type="file" id="logo-file-input" accept="image/*" style="display:none;" onchange="handleLogoUpload(this)">
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="btn btn-primary btn-sm" onclick="$('logo-file-input').click()">📁 Choose Logo</button>
+                    <button class="btn btn-ghost btn-sm" onclick="clearLogo()" id="logo-clear-btn" style="display:none;">✕ Remove</button>
+                  </div>
+                  <div style="font-size:11px;color:var(--text3);margin-top:8px;">PNG or JPG recommended. Saved to cloud — works on all devices.</div>
+                  <div id="logo-save-status" style="margin-top:8px;font-size:13px;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Google Chat Webhook -->
+          <div class="table-card" style="margin-bottom:20px;">
+            <div class="table-header"><span class="table-title">💬 Google Chat — Auto Space Creation</span></div>
+            <div style="padding:20px;">
+              <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;">
+                ⚡ <strong>Always on</strong> — every new job automatically creates a dedicated Google Chat space with full job details.
+              </div>
+              <div class="form-group" style="margin-bottom:16px;">
+                <label class="form-label">Space Members <span style="color:var(--text3);font-weight:400;">(comma separated emails)</span></label>
+                <div style="display:flex;gap:8px;">
+                  <input class="form-control" id="settings-gchat-members" type="text" placeholder="dogpackcon@gmail.com, ryley@gmail.com" style="flex:1;font-size:13px;">
+                  <button class="btn btn-primary" onclick="saveGChatMembers()">Save</button>
+                </div>
+                <div id="gchat-members-status" style="margin-top:8px;font-size:13px;"></div>
+                <div style="font-size:11px;color:var(--text3);margin-top:6px;">Everyone listed here gets added to each new job space automatically.</div>
+              </div>
+              <div class="form-group" style="margin-bottom:12px;">
+                <label class="form-label">Webhook URL <span style="color:var(--text3);font-weight:400;">(optional — for status update notifications)</span></label>
+                <div style="display:flex;gap:8px;">
+                  <input class="form-control" id="settings-gchat-webhook" type="text" placeholder="https://chat.googleapis.com/v1/spaces/..." style="flex:1;font-size:12px;font-family:monospace;">
+                  <button class="btn btn-primary" onclick="saveGChatWebhook()">Save</button>
+                </div>
+                <div id="gchat-status" style="margin-top:8px;font-size:13px;"></div>
+              </div>
+              <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+                  <input type="checkbox" id="gchat-notify-status" onchange="saveGChatSettings()"> Status change notifications
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+                  <input type="checkbox" id="gchat-notify-invoice" onchange="saveGChatSettings()"> Invoice notifications
+                </label>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="testGChatWebhook()">🧪 Test Webhook</button>
+            </div>
+          </div>
+
           <!-- Business Settings -->
           <div class="table-card" style="margin-bottom:20px;">
             <div class="table-header"><span class="table-title">🏢 Business Settings</span></div>
@@ -801,6 +860,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
           <div style="display:flex;gap:10px;">
             <button class="btn btn-ghost" onclick="clearQuoteBuilder()">🗑 Clear</button>
             <button class="btn btn-ghost" id="copy-mat-btn" onclick="copyMaterialList()" style="border-color:var(--blue);color:var(--blue);">📋 Copy Material List</button>
+            <button class="btn btn-ghost" onclick="aiGenerateScope()" style="border-color:var(--accent);color:var(--accent);">✨ AI Scope</button>
             <button class="btn btn-ghost" onclick="exportQuotePDF()" style="border-color:var(--green);color:var(--green);">📄 PDF</button>
             <button class="btn btn-ghost" id="create-job-btn" onclick="createJobFromQuote()">⚡ Create Job</button>
             <button class="btn btn-primary" onclick="saveQuoteFromBuilder()">💾 Save Quote</button>
@@ -1920,14 +1980,15 @@ function openNewJob() {
 function saveJob() {
   const code = $('j-code').value.trim();
   if (!code) { alert('Job code required'); return; }
-  // Check for duplicate code on new jobs
-  if (state.editIdx.jobs === null) {
+  const isNew = state.editIdx.jobs === null;
+  if (isNew) {
     if (state.jobs.find(j => j.code === code)) {
       alert(`Job code ${code} already exists. Use a different number.`); return;
     }
   }
   const lhrs  = parseFloat($('j-lhrs').value)  || 0;
   const lcost = parseFloat($('j-lcost').value)  || parseFloat((lhrs * 65).toFixed(2));
+  const oldStatus = isNew ? null : state.jobs[state.editIdx.jobs]?.status;
   const obj = {
     code,
     date:    new Date().toISOString().split('T')[0],
@@ -1943,13 +2004,22 @@ function saveJob() {
     paid:    $('j-paid').value,
     notes:   $('j-notes').value
   };
-  if (state.editIdx.jobs !== null) state.jobs[state.editIdx.jobs] = obj;
-  else state.jobs.push(obj);
+  if (!isNew) state.jobs[state.editIdx.jobs] = obj;
+  else        state.jobs.push(obj);
   state.editIdx.jobs = null;
   saveData();
   updateNextJobDisplay();
   closeModal('modal-job');
   renderJobs();
+  renderDashboard();
+
+  // Auto-notify Google Chat
+  if (isNew) {
+    notifyNewJob(obj);
+  } else if (oldStatus && oldStatus !== obj.status) {
+    notifyStatusChange(obj, oldStatus);
+    if (['Billed','Rough in Billed'].includes(obj.status)) notifyInvoiced(obj);
+  }
 }
 
 // ===================== MATERIALS =====================
@@ -3268,12 +3338,35 @@ async function renderSettings() {
   $('settings-lab-sell').value  = biz.labSell  || 95;
   $('settings-markup').value    = biz.markup   || 30;
 
+  // Load logo preview
+  const logo = localStorage.getItem('packops_logo') || await loadLogo().catch(()=>'');
+  if (logo) {
+    const img = $('logo-preview-img');
+    const ph  = $('logo-preview-placeholder');
+    const clr = $('logo-clear-btn');
+    if (img) { img.src = logo; img.style.display = 'block'; }
+    if (ph)  ph.style.display = 'none';
+    if (clr) clr.style.display = '';
+  }
+
+  // Load Google Chat members
+  const members = localStorage.getItem('packops_gchat_members') || 'dogpackcon@gmail.com';
+  if ($('settings-gchat-members')) $('settings-gchat-members').value = members;
+  if ($('settings-gchat-webhook')) {
+    $('settings-gchat-webhook').value = webhook ? webhook.slice(0,40) + '...' : '';
+    $('settings-gchat-webhook').placeholder = webhook ? '(webhook saved)' : 'https://chat.googleapis.com/v1/spaces/...';
+  }
+  const gchatSettings = JSON.parse(localStorage.getItem('packops_gchat_settings') || '{}');
+  if ($('gchat-notify-newjob'))  $('gchat-notify-newjob').checked  = gchatSettings.newJob  || false;
+  if ($('gchat-notify-status'))  $('gchat-notify-status').checked  = gchatSettings.status  || false;
+  if ($('gchat-notify-invoice')) $('gchat-notify-invoice').checked = gchatSettings.invoice || false;
+
   // About section
   const nextJob = $('settings-next-job');
   if (nextJob) nextJob.textContent = getNextJobNum();
   const summary = $('settings-data-summary');
   if (summary) summary.textContent =
-    `${state.jobs.length} jobs · ${state.leads.length} leads · ${state.quotes.length} quotes · ${state.materials.length} materials`;
+    `${state.jobs.length} jobs · ${state.leads.length} leads · ${state.quotes.length} quotes · ${state.materials.length} materials · ${state.contacts.length} contacts`;
 }
 
 function updateKeyStatus(key) {
@@ -4224,8 +4317,311 @@ function runPriceImport() {
     </div>`;
 }
 
-// ===================== PDF EXPORT =====================
-function exportQuotePDF() {
+// ===================== LOGO =====================
+async function handleLogoUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const b64 = e.target.result; // data:image/...;base64,...
+    $('logo-save-status').innerHTML = '<span style="color:var(--yellow);">⏳ Saving...</span>';
+    // Show preview
+    $('logo-preview-img').src = b64;
+    $('logo-preview-img').style.display = 'block';
+    $('logo-preview-placeholder').style.display = 'none';
+    $('logo-clear-btn').style.display = '';
+    // Save to Supabase app_settings
+    try {
+      const res = await fetch(SUPABASE_URL + '/rest/v1/app_settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_KEY,
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({ id: 'packops_settings', logo_b64: b64, updated_at: new Date().toISOString() })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      localStorage.setItem('packops_logo', b64);
+      $('logo-save-status').innerHTML = '<span style="color:var(--green);">✓ Logo saved to cloud — appears on all PDFs</span>';
+    } catch(e) {
+      localStorage.setItem('packops_logo', b64);
+      $('logo-save-status').innerHTML = '<span style="color:var(--yellow);">💾 Saved locally</span>';
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function loadLogo() {
+  // Try Supabase first
+  try {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/app_settings?id=eq.packops_settings&select=logo_b64', {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    if (res.ok) {
+      const rows = await res.json();
+      if (rows[0]?.logo_b64) {
+        localStorage.setItem('packops_logo', rows[0].logo_b64);
+        return rows[0].logo_b64;
+      }
+    }
+  } catch(e) {}
+  return localStorage.getItem('packops_logo') || '';
+}
+
+function clearLogo() {
+  if (!confirm('Remove logo?')) return;
+  localStorage.removeItem('packops_logo');
+  $('logo-preview-img').style.display = 'none';
+  $('logo-preview-placeholder').style.display = '';
+  $('logo-clear-btn').style.display = 'none';
+  $('logo-save-status').innerHTML = '';
+  fetch(SUPABASE_URL + '/rest/v1/app_settings?id=eq.packops_settings', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY },
+    body: JSON.stringify({ logo_b64: null })
+  }).catch(() => {});
+}
+
+// ===================== GOOGLE CHAT =====================
+function saveGChatMembers() {
+  const val = $('settings-gchat-members')?.value?.trim();
+  if (!val) return;
+  localStorage.setItem('packops_gchat_members', val);
+  $('gchat-members-status').innerHTML = '<span style="color:var(--green);">✓ Saved</span>';
+  setTimeout(() => { if($('gchat-members-status')) $('gchat-members-status').innerHTML=''; }, 2000);
+}
+
+async function saveGChatWebhook() {
+  const url = $('settings-gchat-webhook').value.trim();
+  if (!url) return;
+  $('gchat-status').innerHTML = '<span style="color:var(--yellow);">⏳ Saving...</span>';
+  try {
+    await fetch(SUPABASE_URL + '/rest/v1/app_settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Prefer': 'resolution=merge-duplicates' },
+      body: JSON.stringify({ id: 'packops_settings', gchat_webhook: url, updated_at: new Date().toISOString() })
+    });
+    localStorage.setItem('packops_gchat_webhook', url);
+    $('gchat-status').innerHTML = '<span style="color:var(--green);">✓ Webhook saved</span>';
+  } catch(e) {
+    localStorage.setItem('packops_gchat_webhook', url);
+    $('gchat-status').innerHTML = '<span style="color:var(--yellow);">💾 Saved locally</span>';
+  }
+}
+
+function saveGChatSettings() {
+  const settings = {
+    newJob:    $('gchat-notify-newjob')?.checked || false,
+    status:    $('gchat-notify-status')?.checked || false,
+    invoice:   $('gchat-notify-invoice')?.checked || false,
+  };
+  localStorage.setItem('packops_gchat_settings', JSON.stringify(settings));
+}
+
+async function getGChatWebhook() {
+  try {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/app_settings?id=eq.packops_settings&select=gchat_webhook', {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    if (res.ok) {
+      const rows = await res.json();
+      if (rows[0]?.gchat_webhook) return rows[0].gchat_webhook;
+    }
+  } catch(e) {}
+  return localStorage.getItem('packops_gchat_webhook') || '';
+}
+
+async function sendGChatMessage(text) {
+  const webhook = await getGChatWebhook();
+  if (!webhook) return;
+  try {
+    await fetch(webhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+  } catch(e) { console.warn('Google Chat notify failed:', e.message); }
+}
+
+async function testGChatWebhook() {
+  const webhook = $('settings-gchat-webhook').value.trim() || await getGChatWebhook();
+  if (!webhook) { alert('Enter a webhook URL first'); return; }
+  $('gchat-status').innerHTML = '<span style="color:var(--yellow);">⏳ Sending test...</span>';
+  try {
+    await fetch(webhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: '✅ *Pack Operations* webhook connected!\n⚡ Job notifications are now active.' })
+    });
+    $('gchat-status').innerHTML = '<span style="color:var(--green);">✓ Test sent — check your Google Chat space</span>';
+  } catch(e) {
+    $('gchat-status').innerHTML = `<span style="color:var(--red);">✗ Failed: ${e.message}</span>`;
+  }
+}
+
+async function notifyNewJob(job) {
+  // Get contact details to include in the space
+  const contact = state.contacts.find(c => c.name === job.client || c.company === job.client);
+  const jobWithContact = { ...job, contact: contact ? { phone: contact.phone, address: contact.address || contact.city } : {} };
+
+  // Get member emails from settings (defaults to dogpackcon@gmail.com)
+  const stored = localStorage.getItem('packops_gchat_members') || '';
+  const memberEmails = stored ? stored.split(',').map(e => e.trim()).filter(Boolean) : ['dogpackcon@gmail.com'];
+
+  try {
+    const res = await fetch('https://bktlwcqllvxkxbeibrhl.supabase.co/functions/v1/create-job-space', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY
+      },
+      body: JSON.stringify({ job: jobWithContact, memberEmails })
+    });
+    const data = await res.json();
+    if (data.success) {
+      console.log('✓ Google Chat space created:', data.spaceName);
+      // Show a toast
+      const fb = document.createElement('div');
+      fb.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:10px 20px;border-radius:8px;font-weight:600;z-index:9999;font-size:13px;max-width:300px;text-align:center;';
+      fb.textContent = '💬 Google Chat space created: ' + data.spaceName;
+      document.body.appendChild(fb);
+      setTimeout(() => fb.remove(), 4000);
+    } else {
+      console.warn('Google Chat space creation failed:', data.error);
+    }
+  } catch(e) {
+    console.warn('Google Chat notify failed:', e.message);
+  }
+}
+
+async function notifyStatusChange(job, oldStatus) {
+  const settings = JSON.parse(localStorage.getItem('packops_gchat_settings') || '{}');
+  if (!settings.status) return;
+  const statusEmoji = {
+    'In Progress': '🔨', 'Complete': '✅', 'Billed': '💸',
+    'Rough in Billed': '📋', 'Paid': '💰', 'On Hold': '⏸', 'Pending': '🕐'
+  };
+  const emoji = statusEmoji[job.status] || '📋';
+  const msg = `${emoji} *Job Status Update*\n*${job.code}* — ${job.client}\n${oldStatus} → *${job.status}*${job.revenue ? `\nRevenue: $${job.revenue.toLocaleString()}` : ''}`;
+  await sendGChatMessage(msg);
+}
+
+async function notifyInvoiced(job) {
+  const settings = JSON.parse(localStorage.getItem('packops_gchat_settings') || '{}');
+  if (!settings.invoice) return;
+  const msg = `💰 *Job Invoiced*\n*${job.code}* — ${job.client}\nAmount: *$${(job.revenue||0).toLocaleString()}*\nStatus: ${job.status}`;
+  await sendGChatMessage(msg);
+}
+
+// ===================== AI SCOPE OF WORK (QUOTE) =====================
+async function aiGenerateScope() {
+  const client   = $('qb-client')?.value?.trim() || '';
+  const project  = $('qb-project')?.value?.trim() || '';
+  const jobtype  = $('qb-jobtype')?.value?.trim() || '';
+  const markup   = parseFloat($('qb-markup')?.value) || 30;
+  const labRate  = parseFloat($('qb-labrate')?.value) || 95;
+
+  // Build context from current line items
+  const assemblies = [...new Set(state.qbLines.map(l => l.assemblyName).filter(Boolean))];
+  const matLines   = state.qbLines.filter(l => !l.isLabour);
+  const labLines   = state.qbLines.filter(l => l.isLabour);
+  const labHrs     = labLines.reduce((s,l) => s+(l.qty||0), 0);
+  const matCost    = matLines.reduce((s,l) => s+(l.qty||0)*(l.cost||0), 0);
+  const total      = matCost*(1+markup/100) + labHrs*labRate;
+
+  const btn = document.querySelector('[onclick="aiGenerateScope()"]');
+  if (btn) { btn.textContent = '⏳ Writing...'; btn.disabled = true; }
+
+  // Show modal
+  $('scope-modal-body').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3);">⏳ Generating professional scope of work...</div>';
+  openModal('modal-scope');
+
+  try {
+    const res = await fetch('https://bktlwcqllvxkxbeibrhl.supabase.co/functions/v1/Job-Brief', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY
+      },
+      body: JSON.stringify({
+        systemPrompt: `You are a professional electrical contractor in British Columbia, Canada writing formal quotes. 
+Write clear, professional scope of work descriptions that:
+- Use proper electrical terminology
+- Reference CEC (Canadian Electrical Code) where relevant
+- Sound confident and experienced
+- Are suitable to send directly to clients
+- Include any relevant notes about permits, inspections, or BC Hydro requirements when applicable`,
+        prompt: `Write a professional scope of work for an electrical quote with these details:
+
+Client: ${client || 'Client'}
+Project Type: ${jobtype || 'Electrical Work'}
+Description: ${project || 'Electrical work as discussed'}
+Assemblies/Work: ${assemblies.length ? assemblies.join(', ') : 'General electrical work'}
+Key Materials: ${matLines.slice(0,8).map(l=>l.label).join(', ') || 'Standard electrical materials'}
+Estimated Labour: ${labHrs > 0 ? labHrs + ' hours' : 'TBD'}
+Estimated Total: ${total > 0 ? '$' + total.toFixed(0) : 'TBD'}
+
+Write a professional 3-5 paragraph scope of work that:
+1. Briefly describes the project and location/context
+2. Lists the specific electrical work to be performed
+3. Mentions materials and standards (CEC 2021 compliance)
+4. Notes any exclusions, allowances, or conditions
+5. Ends with payment terms (net 30, GST/PST applicable)
+
+Format it ready to paste into a quote document. Professional but not overly formal.`
+      })
+    });
+
+    const data = await res.json();
+    const text = data.content?.[0]?.text || data.error?.message || 'Could not generate scope.';
+
+    $('scope-modal-body').innerHTML = `
+      <div style="padding:4px;">
+        <div id="scope-text" style="white-space:pre-wrap;font-size:13px;line-height:1.7;color:var(--text);">${text}</div>
+        <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="applyScope()">✓ Use This</button>
+          <button class="btn btn-ghost" onclick="aiGenerateScope()">🔄 Regenerate</button>
+          <button class="btn btn-ghost" onclick="copyScopeText()">📋 Copy</button>
+          <button class="btn btn-ghost" onclick="closeModal('modal-scope')">✕ Close</button>
+        </div>
+      </div>`;
+  } catch(e) {
+    $('scope-modal-body').innerHTML = `<div style="color:var(--red);padding:20px;">Error: ${e.message}</div>`;
+  } finally {
+    if (btn) { btn.textContent = '✨ AI Scope'; btn.disabled = false; }
+  }
+}
+
+function applyScope() {
+  const text = $('scope-text')?.textContent || '';
+  if (text && $('qb-project')) {
+    $('qb-project').value = text.split('\n')[0].slice(0, 120); // first line as desc
+  }
+  // Also store full scope for PDF
+  window._lastScope = $('scope-text')?.textContent || '';
+  closeModal('modal-scope');
+  // Flash confirmation
+  const fb = document.createElement('div');
+  fb.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:10px 20px;border-radius:8px;font-weight:600;z-index:9999;font-size:14px;';
+  fb.textContent = '✓ Scope applied to quote';
+  document.body.appendChild(fb);
+  setTimeout(() => fb.remove(), 2500);
+}
+
+function copyScopeText() {
+  const text = $('scope-text')?.textContent || '';
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('[onclick="copyScopeText()"]');
+    if (btn) { btn.textContent = '✓ Copied!'; setTimeout(() => btn.textContent = '📋 Copy', 2000); }
+  });
+}
+
+
+async function exportQuotePDF() {
   const { jsPDF } = window.jspdf;
   if (!jsPDF) { alert('PDF library not loaded yet, try again in a moment.'); return; }
   const client  = $('qb-client').value || 'Client';
@@ -4245,86 +4641,106 @@ function exportQuotePDF() {
   const pst      = subtotal*0.07;
   const total    = subtotal+gst+pst;
 
-  const doc = new jsPDF();
+  const doc    = new jsPDF();
   const orange = [244,166,35];
   const dark   = [15,17,23];
   const gray   = [100,116,139];
+  const white  = [255,255,255];
 
-  // Header
-  doc.setFillColor(...dark); doc.rect(0,0,210,40,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(22);
-  doc.setTextColor(...orange); doc.text('⚡ PACK OPERATIONS', 14, 18);
-  doc.setFontSize(10); doc.setTextColor(200,200,200);
-  doc.text('Electrical Contractor · Spallumcheen, BC', 14, 26);
-  doc.setFontSize(18); doc.setTextColor(255,255,255);
-  doc.text('QUOTE', 170, 18, { align:'right' });
-  doc.setFontSize(10); doc.setTextColor(200,200,200);
-  doc.text(new Date().toLocaleDateString('en-CA'), 170, 26, { align:'right' });
+  // Header background
+  doc.setFillColor(...dark); doc.rect(0,0,210,45,'F');
 
-  // Bill To + Job Info
-  doc.setFontSize(9); doc.setTextColor(...gray); doc.text('BILL TO', 14, 52);
-  doc.setFontSize(13); doc.setTextColor(...dark); doc.setFont('helvetica','bold');
-  doc.text(client, 14, 60);
+  // Try to add logo
+  const logo = localStorage.getItem('packops_logo') || await loadLogo().catch(()=>'');
+  if (logo && logo.startsWith('data:image')) {
+    try {
+      const ext = logo.includes('png') ? 'PNG' : 'JPEG';
+      doc.addImage(logo, ext, 10, 6, 35, 32);
+    } catch(e) {}
+  }
+
+  const textX = (logo && logo.startsWith('data:image')) ? 52 : 14;
+  doc.setFont('helvetica','bold'); doc.setFontSize(20);
+  doc.setTextColor(...orange); doc.text('PACK OPERATIONS', textX, 18);
+  doc.setFontSize(9); doc.setTextColor(180,180,180); doc.setFont('helvetica','normal');
+  doc.text('Licensed Electrical Contractor · Spallumcheen, BC', textX, 26);
+  doc.text('dogpackcon@gmail.com', textX, 32);
+
+  doc.setFontSize(20); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold');
+  doc.text('QUOTE', 196, 20, { align:'right' });
+  doc.setFontSize(9); doc.setTextColor(180,180,180); doc.setFont('helvetica','normal');
+  doc.text(new Date().toLocaleDateString('en-CA'), 196, 28, { align:'right' });
+  if (jobCode) doc.text('Job #' + jobCode, 196, 34, { align:'right' });
+
+  let y = 55;
+  doc.setFontSize(8); doc.setTextColor(...gray); doc.text('PREPARED FOR', 14, y);
+  doc.setFontSize(14); doc.setTextColor(...dark); doc.setFont('helvetica','bold');
+  doc.text(client, 14, y+8);
   doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.setTextColor(...gray);
-  doc.text(project, 14, 67);
-  if (jobCode) doc.text('Job #: ' + jobCode, 14, 74);
+  if (project) doc.text(project, 14, y+15);
+  const validDate = new Date(); validDate.setDate(validDate.getDate()+30);
+  doc.setFontSize(8); doc.text('Valid until: ' + validDate.toLocaleDateString('en-CA'), 196, y+8, { align:'right' });
 
-  // Line items table
+  y += 28;
+
+  // Scope of work if generated
+  const scope = window._lastScope || '';
+  if (scope) {
+    doc.setFillColor(245,245,245); doc.roundedRect(12, y, 186, 7, 1, 1, 'F');
+    doc.setFontSize(9); doc.setTextColor(...dark); doc.setFont('helvetica','bold');
+    doc.text('SCOPE OF WORK', 14, y+5); y += 11;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(40,40,40);
+    const lines = doc.splitTextToSize(scope, 182);
+    const maxLines = Math.min(lines.length, 20);
+    doc.text(lines.slice(0,maxLines), 14, y);
+    y += maxLines * 4.5 + 6;
+  }
+
+  // Line items
   const tableData = [];
   if (matLines.length) {
-    tableData.push([{content:'MATERIALS', colSpan:4, styles:{fontStyle:'bold', fillColor:[240,240,240], textColor:dark}}]);
+    tableData.push([{content:'MATERIALS', colSpan:4, styles:{fontStyle:'bold', fillColor:[235,235,235], textColor:dark}}]);
     matLines.forEach(l => {
       const sell = (l.qty||0)*(l.cost||0)*(1+markup);
-      tableData.push([l.label, l.qty, '$'+(l.cost*(1+markup)).toFixed(2), '$'+sell.toFixed(2)]);
+      tableData.push([l.label, String(l.qty), '$'+(l.cost*(1+markup)).toFixed(2), '$'+sell.toFixed(2)]);
     });
   }
   if (labLines.length) {
-    tableData.push([{content:'LABOUR', colSpan:4, styles:{fontStyle:'bold', fillColor:[240,240,240], textColor:dark}}]);
-    const byAssembly = {};
-    labLines.forEach(l => { const k=l.assemblyName||'Labour'; if(!byAssembly[k])byAssembly[k]=0; byAssembly[k]+=(l.qty||0); });
-    Object.entries(byAssembly).forEach(([name,hrs]) => {
-      tableData.push([name, hrs+'h', '$'+labRate+'/hr', '$'+(hrs*labRate).toFixed(2)]);
-    });
+    tableData.push([{content:'LABOUR', colSpan:4, styles:{fontStyle:'bold', fillColor:[235,235,235], textColor:dark}}]);
+    const byAsm = {};
+    labLines.forEach(l => { const k=l.assemblyName||'Labour'; if(!byAsm[k])byAsm[k]=0; byAsm[k]+=(l.qty||0); });
+    Object.entries(byAsm).forEach(([name,hrs]) => tableData.push([name, hrs+'h', '$'+labRate+'/hr', '$'+(hrs*labRate).toFixed(2)]));
   }
 
   doc.autoTable({
-    startY: 82,
-    head: [['Description','Qty','Rate','Amount']],
-    body: tableData,
-    theme: 'grid',
-    headStyles: { fillColor: dark, textColor: 255, fontSize: 9 },
-    bodyStyles: { fontSize: 9, textColor: dark },
-    columnStyles: { 2:{halign:'right'}, 3:{halign:'right'} },
-    margin: { left:14, right:14 }
+    startY: y, head: [['Description','Qty','Rate','Amount']], body: tableData, theme: 'grid',
+    headStyles: { fillColor: dark, textColor: white, fontSize: 9, fontStyle: 'bold' },
+    bodyStyles: { fontSize: 8.5, textColor: dark },
+    columnStyles: { 0:{cellWidth:90}, 1:{cellWidth:20,halign:'center'}, 2:{cellWidth:35,halign:'right'}, 3:{cellWidth:35,halign:'right'} },
+    margin: { left:12, right:12 }
   });
 
-  // Totals
-  const finalY = doc.lastAutoTable.finalY + 8;
-  const tRows  = [
-    ['Subtotal', '$'+subtotal.toFixed(2)],
-    ['GST (5%)', '$'+gst.toFixed(2)],
-    ['PST (7%)', '$'+pst.toFixed(2)],
-  ];
+  const fY = doc.lastAutoTable.finalY + 6;
   doc.autoTable({
-    startY: finalY, body: tRows,
-    theme: 'plain',
-    bodyStyles: { fontSize: 10 },
-    columnStyles: { 0:{cellWidth:130, textColor:gray}, 1:{cellWidth:30, halign:'right', textColor:dark} },
-    margin: { left:80, right:14 }
+    startY: fY,
+    body: [['Subtotal','$'+subtotal.toFixed(2)],['GST (5%)','$'+gst.toFixed(2)],['PST (7%)','$'+pst.toFixed(2)]],
+    theme: 'plain', bodyStyles: { fontSize: 9.5 },
+    columnStyles: { 0:{cellWidth:140,textColor:gray}, 1:{cellWidth:38,halign:'right',textColor:dark} },
+    margin: { left:12, right:12 }
   });
 
-  // Grand total
-  const totY = doc.lastAutoTable.finalY + 4;
-  doc.setFillColor(...orange); doc.roundedRect(140, totY, 56, 14, 3, 3, 'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(0,0,0);
-  doc.text('$'+total.toFixed(2), 168, totY+9, { align:'center' });
-  doc.setFontSize(9); doc.setTextColor(...gray); doc.text('TOTAL (incl. taxes)', 168, totY+4, { align:'center' });
+  const totY = doc.lastAutoTable.finalY + 3;
+  doc.setFillColor(...orange); doc.roundedRect(138, totY, 60, 14, 2, 2, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(0,0,0);
+  doc.text('TOTAL  $'+total.toFixed(2), 168, totY+9, { align:'center' });
 
-  // Footer
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...gray);
-  doc.text('Thank you for your business. This quote is valid for 30 days.', 105, 285, { align:'center' });
+  const pH = doc.internal.pageSize.height;
+  doc.setFillColor(...dark); doc.rect(0, pH-18, 210, 18, 'F');
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(160,160,160);
+  doc.text('Thank you for your business. Payment due net 30. Prices in CAD. GST + PST applicable.', 105, pH-10, { align:'center' });
+  doc.text('Pack Operations · Spallumcheen, BC · Licensed & Insured', 105, pH-5, { align:'center' });
 
-  const fname = `PackOps_Quote_${client.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+  const fname = 'PackOps_Quote_' + client.replace(/[^a-z0-9]/gi,'_') + '_' + new Date().toISOString().split('T')[0] + '.pdf';
   doc.save(fname);
 }
 
@@ -4489,5 +4905,16 @@ try {
 
 <!-- Client datalist for all forms -->
 <datalist id="client-datalist"></datalist>
+
+<!-- AI Scope of Work Modal -->
+<div class="modal-overlay" id="modal-scope" style="display:none;" onclick="if(event.target===this)closeModal('modal-scope')">
+  <div class="modal" style="max-width:640px;max-height:85vh;overflow-y:auto;">
+    <div class="modal-header">
+      <h3 class="modal-title">✨ AI Scope of Work</h3>
+      <button class="modal-close" onclick="closeModal('modal-scope')">✕</button>
+    </div>
+    <div id="scope-modal-body" style="padding:20px;"></div>
+  </div>
+</div>
 </body>
 </html>
